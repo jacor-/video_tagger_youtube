@@ -31,12 +31,12 @@ lasagne.layers.set_all_param_values(output_layer, params['param values'])
 
 
 classification_result = lasagne.layers.get_output(output_layer, loadImage('../../Desktop/cat.jpg')).eval()
-print(classification_result)
+print(CLASSES[classification_result.argmax()])
 
 classification_result = lasagne.layers.get_output(output_layer, loadImage('../../Desktop/bed.jpg')).eval()
-print(classification_result)
+print(CLASSES[classification_result.argmax()])
 
 classification_result = lasagne.layers.get_output(output_layer, loadImage('../../Desktop/futbol.jpg')).eval()
-print(classification_result)
+print(CLASSES[classification_result.argmax()])
 
 
