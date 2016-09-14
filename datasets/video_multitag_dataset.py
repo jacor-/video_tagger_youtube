@@ -35,6 +35,15 @@ class VideoMultitagDataset(object):
 		## We check that everything went well. Whatever conditions we consider
 		self.SanityCheckVideoDatabase()
 
+	def getVideoIds(self):
+		return self.videos.keys()
+
+	def getFrames(self, videoid):
+		return self.videos[videoid]['frames']
+
+	def getLabels(self, videoid):
+		return self.videos[videoid]['labels']
+
 	def SanityCheckVideoDatabase(self):
 		## We consider that there is an error if the number of frames for a video is not correct or the number of tags is not enough
 		# This function raise an exception if something does not look good
