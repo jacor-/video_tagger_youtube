@@ -16,10 +16,11 @@ import numpy as np
 ##               }
 ## }
 ##
+## Each video id at the end of the process must have:
+##  - each final tag appears in at least "minimum_samples_per_tag" videos
+##  - each video has "minimum_tags_per_video" or more tags
+##  - each video has "frames_per_video" frames
 ##
-minimum_samples_per_tag = 20
-minimum_tags_per_video = 2
-frames_per_video = 60
 
 class VideoMultitagDataset(object):
 	def __init__(self, filename, minimum_samples_per_tag, minimum_tags_per_video, frames_per_video):
@@ -102,10 +103,12 @@ class VideoMultitagDataset(object):
 				self.videos.pop(key)
 
 
+if __name__ == '__main__':
+	minimum_samples_per_tag = 20
+	minimum_tags_per_video = 2
+	frames_per_video = 60
 
-minimum_samples_per_tag = 20
-minimum_tags_per_video = 2
-dataset = VideoMultitagDataset('sample_dataset_big.csv', minimum_samples_per_tag, minimum_tags_per_video, frames_per_video)
+	dataset = VideoMultitagDataset('sample_dataset_big.csv', minimum_samples_per_tag, minimum_tags_per_video, frames_per_video)
 
 '''
 t1 = time.time()
