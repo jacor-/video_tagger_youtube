@@ -38,3 +38,6 @@ for to_search in search_criteria:
   vid_id.append(videos)
   tags.append(tag)
   break
+
+
+#youtube-dl -o out https://www.youtube.com/watch?v=GF60Iuh643I
