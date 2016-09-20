@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-def loadImage(imagepath, mean_image):
+def loadImage(imagepath, mean_image = [103.939, 116.779, 123.68]):
     img = cv2.resize(cv2.imread(imagepath), (224, 224))
     mean_pixel = mean_image # [103.939, 116.779, 123.68]
     img = img.astype(np.float32, copy=False)

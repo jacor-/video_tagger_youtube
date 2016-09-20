@@ -13,18 +13,6 @@ import os.path
 ###
 
 
-videos_per_search = 100
-
-api_key = "AIzaSyDV_m-yM9Fdba2rem6w6Cy2GJeWwE2_3r8"
-search_criteria = [#"dog", "cat", "bird", "turtle",
-                   #"fight", "run", "walk", "climb",
-                   "messi neymar suarez", "ronado benzema bale", "guardiola mourinho simeone","barca chelsea munich"
-
-                   #"guardiola", "mourinho","lebron james", "marc gasol", "pau gasol", "tiger woods", "simeone",
-                   #"barcelona", "london", "rome", "amsterdam", "europe", "world",
-                   #"plane", "car", "bike",
-                   #"mariano rajoy", "pablo iglesias", "pedro sanchez", "albert rivera"
-                   ]
 
 class FramesManager(object):
 
@@ -98,11 +86,39 @@ class YoutubeVideoCollector(object):
             np.save(st.path_dataset + "/" + experiment_name + "_tags.npy", self.tags)
             np.save(st.path_dataset + "/" + experiment_name + "_video_ids.npy", np.array(self.video_ids))
 
+        min_occurences_accepted=50
+        max_occurences_accepted=200
+        self.vocab_manager = VideotagsVocabularyManager(self.tags, min_occurences_accepted, max_occurences_accepted)
+        self.valid_videoids = []
+        for video_id in self.video_ids:
+            labels = self.get_labels(video_id)
+            if len(labels) > 0:
+                self.valid_videoids.append(video_id)
+
+
+    def get_labels(self, video_id):
+        tags_for_a_video = self.tags[video_id]
+        labels_for_a_video = self.vocab_manager.get_list_of_labels(tags_for_a_video)
+        return labels_for_a_video
+
+    def get_frames(self, video_id):
+        return self.frames[video_id]
+
+    def get_available_videos(self):
+        return self.valid_videoids
+
+    def save_in_vilynx_format(self, output_file):
+        f = open(output_file, "w")
+        for video_id in self.get_available_videos():
+            for frame in self.get_frames(video_id):
+                video_frame = frame
+                labels = self.get_labels(video_id)
+                f.write(video_frame + ";;;{"+','.join(map(lambda label: self.vocab_manager.get_word(label),labels))+"};"+video_id+"\n")
+        f.close()
 
     def download_frames_and_filter_incorrects(self):
         self.frames = {}
         for video_id in sorted(self.video_ids):
-            print("checking frames " + video_id)
             correct, framelist = FramesManager.download_video_frames(video_id, self.frames_per_video)
             if not correct:
                 self.video_ids.remove(video_id)
@@ -209,11 +225,14 @@ class TagsGenerator(object):
             s = s.replace("$"," ")
             s = s.replace("?"," ")
             s = s.replace("-"," ")
-            s = s.replace("//","/")
+            s = s.replace("//"," ")
+            s = s.replace(")"," ")
+            s = s.replace("("," ")
             s = s.replace("..",".")
             s = s.replace(" / "," ")
             s = s.replace(" \\ "," ")
             s = s.replace("."," . ")
+            s = s.replace(","," ")
             s = re.sub(r"(^\.|/)", r"", s)
             s = re.sub(r"(\.|/)$", r"", s)
             s = re.sub(r"([0-9])([a-z])", r"\1 \2", s)
@@ -243,7 +262,6 @@ class TagsGenerator(object):
             #s = (" ").join([z for z in s.split(" ") if z not in stop_w])
             s = (" ").join([str(strNum[z]) if z in strNum else z for z in s.split(" ")])
             s = (" ").join([stemmer.stem(z) for z in s.split(" ")])
-
             return s
         else:
             return "null"
@@ -261,9 +279,7 @@ class TagsGenerator(object):
                 unique_tags += new_tags
             except:
                 pass
-        return list(set(unique_tags))
-
-
+        return [x for x in list(set(unique_tags)) if len(x) > 1]
 
 
 from collections import Counter
@@ -291,29 +307,37 @@ class VideotagsVocabularyManager(object):
             self.label_to_word[self.word_to_label[key]] = key
 
 
-    def get_label(self,word):
+    def get_word(self,word):
         return self.label_to_word[word]
 
-    def get_word(self,label):
+    def get_label(self,label):
         return self.word_to_label[label]
 
     def get_list_of_labels(self, list_of_tags):
+        # This one will return existin labels (i.e 0,1,2,3,29...)
         list_of_labels = []
         tokens = TagsGenerator.get_tokens(list_of_tags)
-        print(tokens)
         for token in tokens:
             try:
-                list_of_labels.append(self.get_word(token))
+                list_of_labels.append(self.get_label(token))
             except:
                 pass
         return list(set(list_of_labels))
 
-youtube_videos = YoutubeVideoCollector(api_key, "test_experiment", search_criteria = search_criteria, videos_per_search = 100, frames_per_video = 20)
 
-tags = np.load(st.path_dataset + "/test_experiment_tags.npy").item()
 
-vocab_manager = VideotagsVocabularyManager(tags, 50, 200)
-tags_for_a_video = tags[tags.keys()[4]]
-labels_for_a_video = vocab_manager.get_list_of_labels(tags_for_a_video)
+if __name__ == "__main__":
+    videos_per_search = 5000
 
-print(labels_for_a_video)
+    api_key = "AIzaSyDV_m-yM9Fdba2rem6w6Cy2GJeWwE2_3r8"
+    search_criteria = [#"dog", "cat", "bird", "turtle",
+                       #"fight", "run", "walk", "climb",
+                       "messi neymar suarez", "ronado benzema bale", "guardiola mourinho simeone","barca chelsea munich"
+                       #"guardiola", "mourinho","lebron james", "marc gasol", "pau gasol", "tiger woods", "simeone",
+                       #"barcelona", "london", "rome", "amsterdam", "europe", "world",
+                       #"plane", "car", "bike",
+                       #"mariano rajoy", "pablo iglesias", "pedro sanchez", "albert rivera"
+                       ]
+
+    youtube_videos = YoutubeVideoCollector(api_key, "test_experiment", search_criteria = search_criteria, videos_per_search = 100, frames_per_video = 20)
+    youtube_videos.save_in_vilynx_format(st.youtube_dataset)
