@@ -15,14 +15,10 @@ import pickle
 import theano
 import numpy
 import theano.tensor as T
+
 ###
-## This script will prepare a sequenCe dataset based on MNIST.
+## This script will prepare a sequence dataset based on MNIST.
 ###
-
-
-
-
-
 class MNISTOriginalDataset(object):
     @staticmethod
     def download_mnist(dataset):
@@ -43,6 +39,13 @@ class MNISTOriginalDataset(object):
         return train_set, valid_set, test_set
 
     @staticmethod
+    def oneHotEncoding(data_y):
+        labels = np.zeros([data_y.shape[0], 10])
+        for i in range(data_y.shape[0]):
+            labels[i][data_y[i]] = 1
+        return labels
+
+    @staticmethod
     def shared_dataset(data_xy, borrow=True):
         data_x, data_y = data_xy
         shared_x = theano.shared(numpy.asarray(data_x,
@@ -51,7 +54,7 @@ class MNISTOriginalDataset(object):
         shared_y = theano.shared(numpy.asarray(data_y,
                                                dtype=theano.config.floatX),
                                  borrow=borrow)
-        return shared_x, T.cast(shared_y, 'int32')
+        return T.cast(shared_x, 'float32'), T.cast(shared_y, 'int32')
 
     def getSet(self, set_name):
         return self.dataset[set_name]['X'], self.dataset[set_name]['Y']
@@ -75,45 +78,81 @@ class MNISTOriginalDataset(object):
         MNISTOriginalDataset.download_mnist(st.path_mnist_images + "/mnist.pkl.gz")
         train_set, valid_set, test_set = MNISTOriginalDataset.load_data(st.path_mnist_images + "/mnist.pkl.gz")
 
+        test_set = (test_set[0].reshape([-1, 1, 28,28]), MNISTOriginalDataset.oneHotEncoding(test_set[1]))
         test_set_x, test_set_y = MNISTOriginalDataset.shared_dataset(test_set)
+        valid_set = (valid_set[0].reshape([-1, 1, 28,28]), MNISTOriginalDataset.oneHotEncoding(valid_set[1]))
         valid_set_x, valid_set_y = MNISTOriginalDataset.shared_dataset(valid_set)
+        train_set = (train_set[0].reshape([-1, 1, 28,28]), MNISTOriginalDataset.oneHotEncoding(train_set[1]))
         train_set_x, train_set_y = MNISTOriginalDataset.shared_dataset(train_set)
 
         self.dataset = {
-            'Train': {'X': train_set_x, 'Y':train_set_y}
-            'Val'  : {'X': valid_set_x, 'Y':valid_set_y}
+            'Train': {'X': train_set_x, 'Y':train_set_y},
+            'Val'  : {'X': valid_set_x, 'Y':valid_set_y},
             'Test' : {'X': test_set_x, 'Y':test_set_y}
         }
 
 class MNISTSequencesTheano(object):
     @staticmethod
-    def sharedIndexs(dataset, set_name):
-        indexs = []
+    def sharedIndexs2Frames(dataset, set_name):
+        # We will choose some indexs accessing the list index_list. This is the list we will reshuffle when we change from an epoch to the next
+        # We will use the indexs chosen in the previous step to access the indexs2frames, which will return a matrix of indexs  <batch_size, frames_per_video>
+        indexs2frames = []
         for video_id in dataset['video_ids'][set_name]:
-            indexs.append(dataset['frames'][video_id])
-        return theano.shared(np.array(indexs), dtype = 'int32')
+            indexs2frames.append(dataset['frames'][set_name][video_id])
+        index_list = theano.shared(np.array(range(len(indexs2frames)), dtype = np.int32))
+        return index_list, theano.shared(np.array(indexs2frames, dtype =np.int32))
 
 
     def __init__(self, dataset):
+        keys = ['Train', 'Test', 'Val']
+
         self.dataset = dataset
-        self.frames_per_video = len(dataset['frames']['Train'][0])
+        self.frames_per_video = len(dataset['frames']['Train'].values()[0])
 
         self.mnist_dataset = MNISTOriginalDataset()
-        self.train_indexs = sharedIndexs(dataset, 'Train')
-        self.val_indexs = sharedIndexs(dataset, 'Val')
-        self.test_indexs = sharedIndexs(dataset, 'Test')
+        self.indexs = {}
+        for key in keys:
+            indexs, index_to_train = MNISTSequencesTheano.sharedIndexs2Frames(dataset, 'Train')
+            self.indexs[key] = {}
+            self.indexs[key]['indexs'] = indexs
+            self.indexs[key]['indexs2frames'] = index_to_train
+        
+        self.val_indexs = MNISTSequencesTheano.sharedIndexs2Frames(dataset, 'Val')
+        self.test_indexs = MNISTSequencesTheano.sharedIndexs2Frames(dataset, 'Test')
 
-        self.tensor_index = theano.tensor.int32()
-        self._get_batch = {}
-        for key in self.dataset.keys():
-            self._get_batch[key] = theano.function([self.tensor_index], [self.mnist_dataset.getData[key][self.tensor_index], self.mnist_dataset.getLabels[key][self.tensor_index]])
+        t_index = theano.tensor.scalar(dtype = 'int32')
+        t_bsize = theano.tensor.scalar(dtype = 'int32')
+        batch_start = t_index * t_bsize
+        batch_end = (t_index+1) * t_bsize
+
+        self._get_batch_data = {}
+        self._get_batch_labels = {}
+        for key in keys:
+            batch_index_tensor = self.indexs[key]['indexs'][batch_start:batch_end]
+            frames_tensor = self.mnist_dataset.getData(key)[self.indexs[key]['indexs2frames'][batch_index_tensor]]
+            labels_tensor = self.mnist_dataset.getLabels(key)[self.indexs[key]['indexs2frames'][batch_index_tensor]].max(axis=1)
+            #self._get_batch[key] = theano.function([t_index, t_bsize], [frames_tensor, labels_tensor])
+            self._get_batch_data[key]   = frames_tensor
+            self._get_batch_labels[key] = labels_tensor
+
+        self.input_tensors = {'index':t_index, 'bsize': t_bsize}
 
     def get_num_batches(self, set_name, videos_per_batch):
-        return int(len(self.dataset[set_name]['video_ids']) / videos_per_batch)
+        return int(len(self.dataset['video_ids'][set_name]) / videos_per_batch)
 
-    def get_batch(self, batch_index, set_name):
-        return self.
+    def get_batch_data(self, set_name):
+        return self._get_batch_data[set_name]
 
+    def get_batch_labels(self, set_name):
+        return self._get_batch_labels[set_name]
+
+    def get_input_tensors(self):
+        return self.input_tensors
+
+    def shuffle_data(self, set_name):
+        index_in_set = np.array(range(len(self.dataset['video_ids'][set_name])), dtype = np.int32)
+        np.random.shuffle(index_in_set)
+        self.indexs[set_name]['indexs'].set_value(index_in_set)
 
 class MNISTSequencesCollector(object):
     def _generate_videos_(self, mnist_dataset, videos_to_generate):
@@ -132,7 +171,7 @@ class MNISTSequencesCollector(object):
             for i in range(videos_to_generate[set_name]):
                 video_id = "video_" + str(i)
                 chosen_indexs = [random.randint(0, samples_available-1) for cur_ind in range(self.frames_per_video)]
-                self.tags[set_name][video_id] = list(set([labels[j] for j in chosen_indexs]))
+                self.tags[set_name][video_id] = list(set([np.argmax(labels[j]) for j in chosen_indexs]))
                 self.frames[set_name][video_id] = chosen_indexs
                 self.video_ids[set_name].append(video_id)
 
@@ -181,6 +220,7 @@ class MNISTSequencesCollector(object):
                 np.save(st.path_dataset + "/" + experiment_name + "_tags.npy", self.tags)
                 np.save(st.path_dataset + "/" + experiment_name + "_video_ids.npy", np.array(self.video_ids))
             del mnist_dataset
+
     def get_labels(self, video_id, set_name):
         return self.tags[set_name][video_id]
 
@@ -197,10 +237,33 @@ class MNISTSequencesCollector(object):
         res['video_ids'] = self.video_ids
         return res
 
+def aux_visualize_data():
+    from pylab import *
+    #theano_sequence.get_batch(0, 2, 'Train')
+    ### Visualize dataset
+    batch_size = 3
+    data, labels = theano_sequence.get_batch(0, batch_size, 'Train')
+    for i_batch in range(batch_size):
+        figure()
+        print(labels[i_batch])
+        for i in range(frames_per_video):
+            subplot((frames_per_video+1)*100 + 10 + (i+1))
+            imshow(data[i_batch][i][0], cmap = cm.Greys, interpolation = 'None')
+    show()
+
+def get_theano_dataset(experiment_name, videos_to_generate, frames_per_video):
+    mnist_video_collector = MNISTSequencesCollector(experiment_name, videos_to_generate = videos_to_generate, frames_per_video = frames_per_video)
+    theano_sequence = MNISTSequencesTheano(mnist_video_collector.get_dataset())
+    return theano_sequence
+
 if __name__ == "__main__":
     videos_to_generate = {'Train':8, 'Val':5, 'Test':5}
     frames_per_video = 6
-    mnist_video_collector = MNISTSequencesCollector("mnist_test_experiment_train", videos_to_generate = videos_to_generate, frames_per_video = frames_per_video)
-
+    experiment_name = 'perro'
+    mnist_video_collector = MNISTSequencesCollector(experiment_name, videos_to_generate = videos_to_generate, frames_per_video = frames_per_video)
     dataset = mnist_video_collector.get_dataset()
-    #theano_sequence = MNISTSequencesTheano(dataset)
+    theano_sequence = MNISTSequencesTheano(dataset)
+
+    aux_visualize_data()
+    theano_sequence.shuffle_data('Train')
+    aux_visualize_data()
