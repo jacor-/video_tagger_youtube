@@ -115,8 +115,8 @@ theano_dataset = get_theano_dataset(experiment_name, videos_to_generate, frames_
 
 
 
-#inp = lasagne.layers.InputLayer(shape=(video_batches, frames_per_video, 1, 28, 28),  input_var=input_var)
-net = VideoTagsPredictorFramePerFrame(theano_dataset.get_batch_data('Train'), frame_per_frame_network = TypicalCNN, out_size = 10)
+inp = lasagne.layers.InputLayer(shape=(video_batches, frames_per_video, 1, 28, 28),  input_var=theano_dataset.get_batch_data('Train'))
+net = VideoTagsPredictorFramePerFrame(inp, frame_per_frame_network = TypicalCNN, out_size = 10)
 
 
 net_layers, classes, mean_image = net.get_network()
@@ -127,13 +127,17 @@ inps = theano_dataset.get_input_tensors()
 f = theano.function([inps['index'], inps['bsize']], output)
 
 n_epochs = 10
-
+from time import time
 for epoch in range(n_epochs):
     print("Start epoch")    
     theano_dataset.shuffle_data('Train')
     num_batches = theano_dataset.get_num_batches('Train',video_batches)    
     for i_batch in range(num_batches):
-        X_train, y_train = theano_dataset.get_batch(i_batch, video_batches, 'Train')
-        out = f(i_batch, bsize)
+        t1 = time()
+        print("ei!")
+        #X_train, y_train = theano_dataset.get_batch(i_batch, video_batches, 'Train')
+        out = f(i_batch, video_batches)
+        print(time()-t1)
+
     break
 
