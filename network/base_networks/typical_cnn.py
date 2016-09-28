@@ -82,9 +82,9 @@ class VideoTagsPredictorFramePerFrame(object):
 
         cnn = frame_per_frame_network(net_all['reshaped_input'], 10)
         net, classes, mean_image = cnn.get_network()
-        output_layer = net[cnn.get_name_last_layer()]
+        output_layer = cnn.get_output_tensor()
         for key in net:
-            net_all[key] = net[key]
+            net_all['framenet_'+key] = net[key]
 
         net_all['reshaped_output'] = ImagePoolToVideo(output_layer, video_batches, frames_per_video)
         net_all['probsout'] = BatchAverageLayer(net_all['reshaped_output'])
@@ -105,6 +105,11 @@ class VideoTagsPredictorFramePerFrame(object):
     def get_network(self):
         return self.net, self.classes, self.mean_image
 
+    def get_features_tensor(self):
+        return self.net[self.name_features_layer]
+
+    def get_output_tensor(self):
+        return self.net[self.name_last_layer]
 
 
 

@@ -84,8 +84,7 @@ class VGG16Network(object):
         net['fc6_dropout'] = DropoutLayer(net['fc6'], p=0.5)
         net['fc7'] = DenseLayer(net['fc6_dropout'], num_units=4096)
         net['fc7_dropout'] = DropoutLayer(net['fc7'], p=0.5)
-        net['fc8'] = DenseLayer(
-            net['fc7_dropout'], num_units=1000, nonlinearity=None)
+        net['fc8'] = DenseLayer(net['fc7_dropout'], num_units=1000, nonlinearity=None)
         net['prob'] = NonlinearityLayer(net['fc8'], softmax)
 
         return net
