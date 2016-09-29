@@ -5,12 +5,12 @@ import theano
 import theano.tensor as T
 import lasagne.nonlinearities
 
-class BatchAverageLayer(lasagne.layers.Layer):
+class VideoSummarySumSigmoidLayer(lasagne.layers.Layer):
     def __init__(self, incoming, **kwargs):
-        super(BatchAverageLayer, self).__init__(incoming, **kwargs)
-        
+        super(VideoSummarySumSigmoidLayer, self).__init__(incoming, **kwargs)
+
     def get_output_for(self, input, **kwargs):
-        return lasagne.nonlinearities.tanh(T.sum(input, axis=1))
+        return lasagne.nonlinearities.sigmoid(T.sum(input, axis=1))
 
     def get_output_shape_for(self, input_shape):
         return input_shape
@@ -20,7 +20,7 @@ class Video2ImagePool(lasagne.layers.Layer):
     def __init__(self, incoming, **kwargs):
         super(Video2ImagePool, self).__init__(incoming, **kwargs)
         video_batches, frames, channels, weight, height = self.input_shape
-        self.new_shape = [video_batches*frames, channels, weight, height] 
+        self.new_shape = [video_batches*frames, channels, weight, height]
 
     def get_output_for(self, input, **kwargs):
         return T.reshape(input, self.new_shape)
