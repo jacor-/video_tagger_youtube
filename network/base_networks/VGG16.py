@@ -1,3 +1,11 @@
+######
+###
+### TODO: REMOVE THIS ONE AND PREPARE IT AS A CUSTOM LAYER / SUBNETWORK. THE CODE IS BASICALLY THE SAME
+###       YOU WILL ONLY NEED TO SPECIFY THE PARAMETERS (example code: custom_layers/subnoetworks/cnn.py)
+###
+#####
+
+
 # VGG-16, 16-layer model from the paper:
 # "Very Deep Convolutional Networks for Large-Scale Image Recognition"
 # Original source: https://gist.github.com/ksimonyan/211839e770f7b538e2d8
