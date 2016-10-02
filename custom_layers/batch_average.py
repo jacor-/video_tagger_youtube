@@ -10,7 +10,8 @@ class VideoSummarySumSigmoidLayer(lasagne.layers.Layer):
         super(VideoSummarySumSigmoidLayer, self).__init__(incoming, **kwargs)
 
     def get_output_for(self, input, **kwargs):
-        return lasagne.nonlinearities.sigmoid(T.sum(input, axis=1))
+        #return lasagne.nonlinearities.sigmoid(T.sum(input, axis=1))
+        return T.clip(T.max(input, axis=1), 0.01, 0.99)
 
     def get_output_shape_for(self, input_shape):
         return input_shape

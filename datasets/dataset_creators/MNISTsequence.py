@@ -47,7 +47,7 @@ class MNISTOriginalDataset(object):
         shared_y = theano.shared(numpy.asarray(data_y,
                                                dtype=theano.config.floatX),
                                  borrow=borrow)
-        return T.cast(shared_x, 'float32'), T.cast(shared_y, 'int32')
+        return T.cast(shared_x, 'float32'), T.cast(shared_y, 'float32')
 
     def getSet(self, set_name):
         return self.dataset[set_name]['X'], self.dataset[set_name]['Y']

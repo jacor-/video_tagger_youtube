@@ -10,7 +10,7 @@ from lasagne.layers import DenseLayer
 from lasagne.layers import ConcatLayer
 from lasagne.layers import NonlinearityLayer
 from lasagne.layers import GlobalPoolLayer
-
+import time
 ###
 #from lasagne.layers.dnn import Conv2DDNNLayer as ConvLayer
 #from lasagne.layers.dnn import MaxPool2DDNNLayer as PoolLayerDNN
@@ -40,7 +40,11 @@ class TypicalCNN(lasagne.layers.Layer):
         self.name_last_layer = 'probsout'
         self.out_size = out_size
         self.mean_image = [0,0,0]
-        self.net = self.build_model(incoming)
+        self.net, inner_params = self.build_model(incoming)
+
+        for i, param in enumerate(inner_params):
+            self.add_param(param, param.shape.eval(), name=param.name + "_" + str(i))
+
 
     def get_output_for(self, input, **kwargs):
         return lasagne.layers.get_output(self.net[self.name_last_layer], inputs=input)
@@ -53,7 +57,7 @@ class TypicalCNN(lasagne.layers.Layer):
 
     def build_model(self, incoming):
         net = {}
-
+        params = {}
         net['conv1'] = lasagne.layers.Conv2DLayer(  incoming,
                                                     num_filters=32, filter_size=(5, 5),
                                                     nonlinearity=lasagne.nonlinearities.rectify,
@@ -70,12 +74,16 @@ class TypicalCNN(lasagne.layers.Layer):
                                                     num_units=256,
                                                     nonlinearity=lasagne.nonlinearities.rectify)
 
-        ### The last layer is a tanh to be sure it is multiclass (for mnist it does not matter, but we want do so something scalable)
+        ### The last layer is a sigmoid to be sure it is multiclass (for mnist it does not matter, but we want do so something scalable)
+        ## In the original version this was a softmax, which is not useful for multiclass
         net['probsout'] = lasagne.layers.DenseLayer(
                                                     lasagne.layers.dropout(net['featsout'], p=.5),
                                                     num_units=self.out_size,
-                                                    nonlinearity=lasagne.nonlinearities.tanh)
-        return net
+                                                    nonlinearity=lasagne.nonlinearities.sigmoid)
+
+
+        params = lasagne.layers.get_all_params(net['probsout'], trainable=True)
+        return net, params
 
 
 
@@ -91,11 +99,12 @@ theano.config.dnn.enabled = 'True'
 
 
 
-def buildNetwork_tensor(inp_X, network_name, out_size, video_batches, frames_per_video):
-    # We build the network architecture. The final part will define how the network is trained, so we keep
+def buildNetwork_tensor(inp_X, network_name, per_frame_network, out_size, video_batches, frames_per_video):
+    # We build the network architecture. The final part will define how the network is trained, so we keep it
     # within the if statement.
+
     video_unpooled = Video2ImagePool(inp_X)
-    cnnet_out =      TypicalCNN(video_unpooled, out_size)
+    cnnet_out =      per_frame_network(video_unpooled, out_size)
     video_pooled =   ImagePoolToVideo(cnnet_out, video_batches, frames_per_video)
     if network_name == 'mlp_simple_aggregation':
         # We simply aggregate all the frames summing them and aplying a sigmoid layer to that sum
@@ -104,31 +113,50 @@ def buildNetwork_tensor(inp_X, network_name, out_size, video_batches, frames_per
         raise "%s is not implemented yet!" % network_name
 
     # We get the tensors for the outputs of the net: frames prediction and aggregation prediction
+    network = final_classification
     output_features_tensor = lasagne.layers.get_output(video_pooled, deterministic = True)
     output_classification_tensor = lasagne.layers.get_output(final_classification, deterministic = True)
-    return output_features_tensor, output_classification_tensor
+    return output_features_tensor, output_classification_tensor, network
 
-def get_loss_frames_tensor(inp_Y_frames, output_features_tensor):
-    cost_functions = {}
-    cost_functions['cross_entropy'] = lasagne.objectives.binary_crossentropy(inp_Y_frames, output_features_tensor).sum(axis=1).mean()
-    cost_functions['strict_accuracy'] = (inp_Y_video == output_video_tensor >= 0.5).sum(axis = 1).sum() / (inp_Y_frames[0] * inp_Y_frames[1])
 
-def get_loss_frames_video(inp_Y_video, output_video_tensor):
-    cost_functions = {}
-    eqs = T.cast(T.eq(inp_Y_videos, output_classification_tensor >= 0.5),'floatX').sum(axis=1)
-    cost_functions['strict_accuracy'] = T.cast(T.eq(eqs,inp_Y_video.shape[1]), 'float32').sum() / inp_Y_video.shape[0]
-    cost_functions['cross_entropy'] = lasagne.objectives.binary_crossentropy(inp_Y_video, output_video_tensor).sum(axis=1).mean()
 
-def getLossFunction(theano_dataset, set_):
-    X_batch, y_batch = theano_dataset.get_batch_data(set_), theano_dataset.get_batch_labels(set_)
-    f_video_loss = theano.function(
-                                    [inps['index'], inps['bsize']],
-                                    [video_losses['strict_accuracy'], video_losses['cross_entropy']],
-                                    givens = {inp_X.input_var:X_batch,
-                                              inp_Y_video.input_var:Y_batch
-                                              }
-                                   )
-    return f_video_loss
+
+
+class OutputNetworkManager(object):
+    def __init__(self, videos_per_batch, dataset, input_tensors):
+        self.videos_per_batch = videos_per_batch
+        self.dataset = dataset
+        self.input_tensors = input_tensors
+
+        self.f_get_set_outputs = self._prepare_get_output_functions()
+
+
+    def _prepare_get_output_functions(self):
+        out = {}
+        for set_ in ('Train','Test','Val'):
+            X_batch, y_batch_video, y_batch_frame = self.dataset.get_tensor_batch_data(set_), self.dataset.get_tensor_batch_video_labels(set_), self.dataset.get_tensor_batch_frame_labels(set_)
+            f_video_output = theano.function(
+                                            [input_tensors['index'], input_tensors['bsize']],
+                                            [out_frame_tensor, input_tensors['y_frames'], out_video_tensor, input_tensors['y_videos']],
+                                            givens = {input_tensors['inp_data']:X_batch,
+                                                      input_tensors['y_videos']:y_batch_video,
+                                                      input_tensors['y_frames']:y_batch_frame
+                                                      }
+                                           )
+            out[set_] = f_video_output
+        return out
+
+    def getOutputForSet(self, set_):
+        out_frame, y_frames, out_video, y_video = [], [], [], []
+        for i_batch in range(self.dataset.get_num_batches(set_, self.videos_per_batch)):
+            out_frame_, y_frames_, out_video_, y_video_ = self.f_get_set_outputs[set_](i_batch, self.videos_per_batch)
+            out_frame.append(out_frame_)
+            y_frames.append(y_frames_)
+            out_video.append(out_video_)
+            y_video.append(y_video_)
+        return np.vstack(out_frame), np.vstack(y_frames), np.vstack(out_video), np.vstack(y_video)
+
+
 
 
 
@@ -138,33 +166,92 @@ out_size = 10
 
 ## Dataset definition
 experiment_name = 'mnist_test'
-videos_to_generate = {'Train':1000, 'Val':500, 'Test':500}
+videos_to_generate = {'Train':10000, 'Val':1000, 'Test':3000}
 
 theano_dataset = get_theano_dataset(experiment_name, videos_to_generate, frames_per_video)
-inps = theano_dataset.get_input_tensors()
-
+inp_index_batch = theano_dataset.get_input_tensors()
 inp_X =        lasagne.layers.InputLayer(shape=(video_batches, frames_per_video, 1, 28, 28))
 inp_Y_frames = lasagne.layers.InputLayer(shape=(video_batches, frames_per_video, out_size))
 inp_Y_videos = lasagne.layers.InputLayer(shape=(video_batches, out_size))
+input_tensors = { 'index' : inp_index_batch['index'], 'bsize': inp_index_batch['bsize'], 'inp_data' : inp_X.input_var, 'y_videos' : inp_Y_videos.input_var, 'y_frames' : inp_Y_frames.input_var }
 
-out_frame_tensor, out_video_tensor = buildNetwork_tensor(inp_X, 'mlp_simple_aggregation', out_size, video_batches, frames_per_video)
-#video_losses = get_loss_frames_video(lasagne.layers.get_output(inp_Y_videos)[0], output_classification_tensor)
 
+out_frame_tensor, out_video_tensor, network = buildNetwork_tensor(inp_X, 'mlp_simple_aggregation', TypicalCNN, out_size, video_batches, frames_per_video)
+
+netm = OutputNetworkManager(video_batches, theano_dataset, input_tensors)
 
 
 set_ = 'Train'
-X_batch, y_batch_video, y_batch_frame = theano_dataset.get_tensor_batch_data(set_), theano_dataset.get_tensor_batch_video_labels(set_), theano_dataset.get_tensor_batch_frame_labels(set_)
-f_video_loss = theano.function(
-                                [inps['index'], inps['bsize']],
-                                [inp_Y_videos.input_var, inp_X.input_var],
-                                givens = {inp_X.input_var:X_batch,
-                                          inp_Y_videos.input_var:y_batch_video
-                                          }
-                               )
 
 
 
+video_reference = input_tensors['y_videos']
+video_prediction = out_video_tensor
+#video_reference = input_tensors['y_frames']
+#video_prediction = out_frame_tensor
 
+
+loss = lasagne.objectives.categorical_crossentropy(video_prediction, video_reference)
+loss = -video_reference*T.log(video_prediction) - (1-video_reference)*T.log(1-video_prediction)
+loss = loss.mean()
+
+params = lasagne.layers.get_all_params(network, trainable=True)
+print(params)
+
+updates = lasagne.updates.nesterov_momentum(loss, params, learning_rate=0.01, momentum=0.9)
+#updates = lasagne.updates.sgd(loss, params, learning_rate=0.05)
+
+X_batch, y_batch_video, y_batch_frame = theano_dataset.get_tensor_batch_data('Train'), theano_dataset.get_tensor_batch_video_labels('Train'), theano_dataset.get_tensor_batch_frame_labels('Train')
+train_fn = theano.function([input_tensors['index'], input_tensors['bsize']],
+                            loss,
+                            givens = {  input_tensors['inp_data']:X_batch,
+                                        input_tensors['y_videos']:y_batch_video,
+                                        input_tensors['y_frames']:y_batch_frame
+                                      },
+                            updates = updates)
+
+
+check_train_fn = theano.function([input_tensors['index'], input_tensors['bsize']],
+                                    [out_frame_tensor, out_video_tensor, y_batch_video, y_batch_frame, loss],
+                                    givens = {  input_tensors['inp_data']:X_batch,
+                                                input_tensors['y_videos']:y_batch_video,
+                                                input_tensors['y_frames']:y_batch_frame
+                                              },
+                                    updates = updates)
+
+out_f_ini, out_v_ini, y_v_ini, y_f_ini, loss_ini = check_train_fn(0, video_batches)
+#print((-y_f_ini*np.log(out_f_ini)-(1-y_f_ini)*np.log(1-out_f_ini)).mean())
+print((-y_v_ini*np.log(out_v_ini)-(1-y_v_ini)*np.log(1-out_v_ini)).mean())
+print(loss_ini)
+
+losses = []
+for n_epoch in range(25):
+    t1 = time.time()
+    print("Epoch : %d" % n_epoch)
+    epoch_loss = []
+    for i_batch in range(theano_dataset.get_num_batches('Train', video_batches)):
+        loss = train_fn(i_batch, video_batches)
+        epoch_loss.append(loss)
+    losses.append(np.mean(epoch_loss))
+    print("Loss : %0.5f" % losses[-1])
+    print(time.time() - t1)
+    theano_dataset.shuffle_data('Train')
+
+
+#out_f_end, out_v_end, y_v_end, y_f_end, loss_end = test_fn(0, video_batches)
+def printResults(set_):
+    out_frame, y_frames, out_video, y_video = netm.getOutputForSet(set_)
+
+    vid_general_accuracy = float((y_video == (out_video > 0.5)).sum()) / np.multiply(*out_video.shape)
+    frame_accuracy = float((y_frames.argmax(axis=2) == out_frame.argmax(axis=2)).sum()) / np.multiply(*out_frame.shape[:2])
+
+    print("Results for set " + set_)
+    print(" - Frame accuracy: " + str(frame_accuracy))
+    print(" - Video accuracy: " + str(vid_general_accuracy))
+
+printResults('Train')
+printResults('Test')
+printResults('Val')
 
 '''
 
