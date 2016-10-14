@@ -65,15 +65,6 @@ class MNISTOriginalDataset(object):
             labels[i][data_y[i]] = 1
         return labels
 
-    def getNumSamples(self, set_name):
-        if set_name == 'Train':
-            return self.train_set_y.shape[0]
-        elif set_name == 'Val':
-            return self.valid_set_y.shape[0]
-        elif set_name == 'Test':
-            return self.test_set_y.shape[0]
-        return 0
-
     def __init__(self):
         MNISTOriginalDataset.download_mnist(st.path_mnist_images + "/mnist.pkl.gz")
         train_set, valid_set, test_set = MNISTOriginalDataset.load_data(st.path_mnist_images + "/mnist.pkl.gz")
@@ -205,9 +196,6 @@ class MNISTSequencesTheano(object):
             self.indexs[key] = {}
             self.indexs[key]['indexs'] = indexs
             self.indexs[key]['indexs2frames'] = index_to_train
-
-        self.val_indexs = MNISTSequencesTheano.sharedIndexs2Frames(dataset, 'Val')
-        self.test_indexs = MNISTSequencesTheano.sharedIndexs2Frames(dataset, 'Test')
 
         t_index = theano.tensor.scalar(dtype = 'int32')
         t_bsize = theano.tensor.scalar(dtype = 'int32')

@@ -5,16 +5,47 @@ import theano
 import theano.tensor as T
 import lasagne.nonlinearities
 
+
+class VideoSummaryMaxLayer(lasagne.layers.Layer):
+    def __init__(self, incoming, **kwargs):
+        super(VideoSummaryMaxLayer, self).__init__(incoming, **kwargs)
+
+    def get_output_for(self, input, **kwargs):
+        return T.clip(T.max(input, axis=1), 0.01, 0.99)
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape
+
+class VideoSummaryPoissonBernoulli(lasagne.layers.Layer):
+    def __init__(self, incoming, **kwargs):
+        super(VideoSummaryPoissonBernoulli, self).__init__(incoming, **kwargs)
+
+    def get_output_for(self, input, **kwargs):
+        return 1 - T.prod(T.clip(1-input, 0.01, 0.99), axis=1, no_zeros_in_input=True)
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape
+
 class VideoSummarySumSigmoidLayer(lasagne.layers.Layer):
     def __init__(self, incoming, **kwargs):
         super(VideoSummarySumSigmoidLayer, self).__init__(incoming, **kwargs)
 
     def get_output_for(self, input, **kwargs):
-        #return lasagne.nonlinearities.sigmoid(T.sum(input, axis=1))
-        return T.clip(T.max(input, axis=1), 0.01, 0.99)
+        return lasagne.nonlinearities.sigmoid(T.sum(input, axis=1))
 
     def get_output_shape_for(self, input_shape):
         return input_shape
+
+class VideoSummarySumTanhLayer(lasagne.layers.Layer):
+    def __init__(self, incoming, **kwargs):
+        super(VideoSummarySumTanhLayer, self).__init__(incoming, **kwargs)
+
+    def get_output_for(self, input, **kwargs):
+        return lasagne.nonlinearities.tanh(T.sum(input, axis=1))
+
+    def get_output_shape_for(self, input_shape):
+        return input_shape
+
 
 
 class Video2ImagePool(lasagne.layers.Layer):
