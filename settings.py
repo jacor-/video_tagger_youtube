@@ -22,3 +22,4 @@ mnist_seq_dataset_val = path_dataset + "/dataset_mnist_seq_val.csv"
 mnist_seq_dataset_val_npy = path_dataset + "/dataset_mnist_seq_val.npy"
 
 path_mnist_images = datapath + '/images'
+path_cifar_images = datapath + '/images'

@@ -47,7 +47,7 @@ class TypicalCNN(lasagne.layers.Layer):
 
 
     def get_output_for(self, input, **kwargs):
-        return lasagne.layers.get_output(self.net[self.name_last_layer], inputs=input)
+        return lasagne.layers.get_output(self.net[self.name_last_layer], inputs=input, **kwargs)
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.out_size)
@@ -75,7 +75,8 @@ class TypicalCNN(lasagne.layers.Layer):
                                                     nonlinearity=lasagne.nonlinearities.rectify)
 
         ### The last layer is a sigmoid to be sure it is multiclass (for mnist it does not matter, but we want do so something scalable)
-        ## In the original version this was a softmax, which is not useful for multiclass
+        ## TODO: IF YOU ARE PREPARING A MONOCLASS; USE A SOFTMAX, OTHERWISE USE A SIGMOID. THIS SHOULD BE A PARAMETER TO BUILD THE NETWORK!
+        ## TODO: BE CAREFUL. TO DO THE MATHS I WANT TO PROPOSE IN THE PAPER, THE CLASSES ARE SUPPOSED TO BE INDEPENDENT!
         net['probsout'] = lasagne.layers.DenseLayer(
                                                     lasagne.layers.dropout(net['featsout'], p=.5),
                                                     num_units=self.out_size,

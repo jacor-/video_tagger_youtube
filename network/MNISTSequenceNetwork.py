@@ -16,10 +16,14 @@ import settings
 import os
 import pickle
 import os.path
-from datasets.dataset_creators.MNISTsequence import get_theano_dataset
+from datasets.dataset_creators.MNISTsequence import MNISTOriginalDataset
+from datasets.dataset_creators.CIFARsequence import CIFAROriginalDataset
+
+
+from datasets.dataset_creators.SequenceCreator import get_theano_dataset
 from custom_layers.batch_average import ImagePoolToVideo, Video2ImagePool, VideoSummarySumSigmoidLayer, VideoSummaryMaxLayer, VideoSummarySumTanhLayer, VideoSummaryPoissonBernoulli
 from custom_layers.subnetworks.cnn import TypicalCNN
-
+from scipy.spatial import distance
 #theano.config.optimizer = 'None'
 #theano.config.dnn.enabled = 'True'
 
@@ -33,9 +37,24 @@ class OutputNetworkManager(object):
         self.f_get_set_outputs = self._prepare_get_output_functions()
 
 
+    def _getFunctionsCheckInputs(self):
+        out = {}
+        for set_ in ('Train','Test'):
+            X_batch, y_batch_video, y_batch_frame = self.dataset.get_tensor_batch_data(set_), self.dataset.get_tensor_batch_video_labels(set_), self.dataset.get_tensor_batch_frame_labels(set_)
+            f_video_output = theano.function(
+                                            [self.input_tensors['index'], self.input_tensors['bsize']],
+                                            [self.input_tensors['inp_data'].input_var, self.input_tensors['y_frames'].input_var, self.input_tensors['y_videos'].input_var],
+                                            givens = {self.input_tensors['inp_data'].input_var:X_batch,
+                                                      self.input_tensors['y_videos'].input_var:y_batch_video,
+                                                      self.input_tensors['y_frames'].input_var:y_batch_frame
+                                                      }
+                                           )
+            out[set_] = f_video_output
+        return out
+
     def _prepare_get_output_functions(self):
         out = {}
-        for set_ in ('Train','Test','Val'):
+        for set_ in ('Train','Test'):
             X_batch, y_batch_video, y_batch_frame = self.dataset.get_tensor_batch_data(set_), self.dataset.get_tensor_batch_video_labels(set_), self.dataset.get_tensor_batch_frame_labels(set_)
             f_video_output = theano.function(
                                             [self.input_tensors['index'], self.input_tensors['bsize']],
@@ -60,10 +79,11 @@ class OutputNetworkManager(object):
 
 class Network(object):
 
-    def __init__(self, video_batches, frames_per_video, out_size, aggregation, base_net, theano_dataset):
+    def __init__(self, video_batches, frames_per_video, out_size, aggregation, base_net, theano_dataset, inp_image_shape):
         self.video_batches, self.frames_per_video, self.out_size = video_batches, frames_per_video, out_size
         self.aggregation = aggregation
         self.base_net = base_net
+        self.inp_image_shape = inp_image_shape
 
         self.__prepare_input_dataset(theano_dataset)
         self.__prepareNetwork(theano_dataset)
@@ -94,18 +114,22 @@ class Network(object):
 
         # We get the tensors for the outputs of the net: frames prediction and aggregation prediction
         network = final_classification
-        output_features_tensor = lasagne.layers.get_output(video_pooled, deterministic = True)
-        output_classification_tensor = lasagne.layers.get_output(final_classification, deterministic = True)
-        return output_features_tensor, output_classification_tensor, network
+
+        output_features_tensor_test = lasagne.layers.get_output(video_pooled, deterministic = True)
+        output_classification_tensor_test = lasagne.layers.get_output(final_classification, deterministic = True)
+        output_features_tensor_train = lasagne.layers.get_output(video_pooled, deterministic = False)
+        output_classification_tensor_train = lasagne.layers.get_output(final_classification, deterministic = False)
+
+        return output_features_tensor_test, output_classification_tensor_test, output_features_tensor_train, output_classification_tensor_train, network
 
     def __prepareNetwork(self, theano_dataset):
-        self.out_frame_tensor, self.out_video_tensor, self.network = self.__buildNetwork_tensor()
-        self.netm = OutputNetworkManager(self.video_batches, theano_dataset, self.input_tensors, (self.out_frame_tensor, self.out_video_tensor))
+        self.out_frame_tensor_test, self.out_video_tensor_test, self.out_frame_tensor_train, self.out_video_tensor_train, self.network = self.__buildNetwork_tensor()
+        self.netm = OutputNetworkManager(self.video_batches, theano_dataset, self.input_tensors, (self.out_frame_tensor_test, self.out_video_tensor_test))
         self.params = lasagne.layers.get_all_params(self.network, trainable=True)
 
     def __prepare_input_dataset(self, theano_dataset):
         inp_index_batch = theano_dataset.get_input_tensors()
-        inp_X =        lasagne.layers.InputLayer(shape=(self.video_batches, self.frames_per_video, 1, 28, 28))
+        inp_X =        lasagne.layers.InputLayer(shape=(self.video_batches, self.frames_per_video, self.inp_image_shape[0], self.inp_image_shape[1], self.inp_image_shape[2]))
         inp_Y_frames = lasagne.layers.InputLayer(shape=(self.video_batches, self.frames_per_video, self.out_size))
         inp_Y_videos = lasagne.layers.InputLayer(shape=(self.video_batches, self.out_size))
         input_tensors = { 'index' : inp_index_batch['index'], 'bsize': inp_index_batch['bsize'], 'inp_data' : inp_X, 'y_videos' : inp_Y_videos, 'y_frames' : inp_Y_frames }
@@ -115,7 +139,7 @@ class Network(object):
     def __prepare_loss(self):
 
         video_reference = self.input_tensors['y_videos'].input_var
-        video_prediction = self.out_video_tensor
+        video_prediction = self.out_video_tensor_train
 
         loss = lasagne.objectives.categorical_crossentropy(video_prediction, video_reference)
         loss = -video_reference*T.log(video_prediction) - (1-video_reference)*T.log(1-video_prediction)
@@ -124,7 +148,8 @@ class Network(object):
         self.loss = loss
 
     def __prepare_train_function(self, theano_dataset):
-        updates = lasagne.updates.nesterov_momentum(self.loss, self.params, learning_rate=0.01, momentum=0.9)
+        #updates = lasagne.updates.nesterov_momentum(self.loss, self.params, learning_rate=0.01, momentum=0.9)
+        updates = lasagne.updates.sgd(self.loss, self.params, learning_rate=0.01)
 
         X_batch, y_batch_video, y_batch_frame = theano_dataset.get_tensor_batch_data('Train'), theano_dataset.get_tensor_batch_video_labels('Train'), theano_dataset.get_tensor_batch_frame_labels('Train')
         self.train_fn = theano.function([self.input_tensors['index'], self.input_tensors['bsize']],
@@ -134,43 +159,41 @@ class Network(object):
                                                     self.input_tensors['y_frames'].input_var:y_batch_frame
                                                   },
                                         updates = updates)
-    def train(self, nepochs, theano_dataset, collect_metrics_for = ['Val']):
 
-        val_metrics = {'video_acc':[], 'frame_acc':[], 'loss':[]}
+    def train(self, nepochs, theano_dataset, collect_metrics_for = ['Test'], collect_in_multiples_of = 1):
+
         train_metrics = {'video_acc':[], 'frame_acc':[], 'loss':[]}
         test_metrics = {'video_acc':[], 'frame_acc':[], 'loss':[]}
-        metrics = {'Train': train_metrics, 'Val': val_metrics, 'Test': test_metrics}
-
-        val_video_accuracy = []
-        val_frame_accuracy = []
+        metrics = {'Train': train_metrics, 'Test': test_metrics}
 
         losses = []
         for n_epoch in range(nepochs):
             t1 = time.time()
-            print("Epoch : %d" % n_epoch)
             epoch_loss = []
-            for i_batch in range(theano_dataset.get_num_batches('Train', video_batches)):
+            total_batches = theano_dataset.get_num_batches('Train', video_batches)
+            for i_batch in range(total_batches):
                 loss = self.train_fn(i_batch, video_batches)
                 epoch_loss.append(loss)
             losses.append(np.mean(epoch_loss))
 
-            for set_ in collect_metrics_for:
-                out_frame, y_frames, out_video, y_video = self.netm.getOutputForSet(set_)
-                loss, vac, fac = self.getResults(out_frame, y_frames, out_video, y_video)
-                metrics[set_]['video_acc'].append(vac)
-                metrics[set_]['frame_acc'].append(fac)
-                metrics[set_]['loss'].append(loss)
+            if n_epoch % collect_in_multiples_of == 0:
+                for set_ in collect_metrics_for:
+                    out_frame, y_frames, out_video, y_video = self.netm.getOutputForSet(set_)
+                    loss, vac, fac = self.getResults(out_frame, y_frames, out_video, y_video)
+                    metrics[set_]['video_acc'].append(vac)
+                    metrics[set_]['frame_acc'].append(fac)
+                    metrics[set_]['loss'].append(loss)
 
-            print("Loss : %0.5f" % losses[-1])
-            print("Time : %0.4f" % (time.time() - t1))
+            print("Epoch %d .   Loss : %0.5f    . Time: %0.2f" % (n_epoch, losses[-1], time.time() - t1))
             theano_dataset.shuffle_data('Train')
 
         return metrics
 
     def getResults(self, out_frame, y_frames, out_video, y_video):
-        vid_general_accuracy = float((y_video == (out_video > 0.5)).sum()) / np.multiply(*out_video.shape)
+        print(out_video.shape)
+        vid_general_accuracy = distance.hamming(np.hstack(y_video), np.hstack(out_video > 0.5))
         frame_accuracy = float((y_frames.argmax(axis=2) == out_frame.argmax(axis=2)).sum()) / np.multiply(*out_frame.shape[:2])
-        losses = -(y_video * np.log(out_video) -(1-y_video) * np.log(1-out_video) ).sum() / np.multiply(*out_video.shape)
+        losses = (-y_video * np.log(out_video) -(1-y_video) * np.log(1-out_video) ).sum() / np.multiply(*out_video.shape)
         return losses, vid_general_accuracy, frame_accuracy
 
     #out_f_end, out_v_end, y_v_end, y_f_end, loss_end = test_fn(0, video_batches)
@@ -182,65 +205,87 @@ class Network(object):
         print(" - Video accuracy: " + str(vid_general_accuracy))
         print(" - Loss: " + str(losses))
 
+testing_now = 'cifar-100'
+
+if __name__ == '__main__':
+
+    if testing_now == 'mnist':
+        original_dataset = MNISTOriginalDataset()
+        frames_per_video = 3
+        video_batches = 50
+        out_size = 10
+        experiment_name = 'mnist_test_2'
+        videos_to_generate = {'Train':10000, 'Test':1000}
+        base_net = TypicalCNN
+        inp_shape = [1,28,28]
+    elif testing_now == 'cifar-100':
+        original_dataset = CIFAROriginalDataset()
+        frames_per_video = 3
+        video_batches = 50
+        out_size = 100
+        experiment_name = 'cifar_test_2'
+        videos_to_generate = {'Train':10000, 'Test':1000}
+        base_net = TypicalCNN
+        inp_shape = [3,32,32]
+
+    else:
+        raise "Experiment not ready yet!"
+
+    vaccs, faccs, names = [], [], []
+
+    nepochs = 3
+    metric_list = []
+
+    for aggregation in ["max_aggregation"]:#, "tanh_aggregation" , "max_aggregation"]: #"sigmoid_aggregation"
+
+        np.random.seed(1234)
+        ### I strongly recommend this function to create the dataset. Pass the parameters and forget about the implementation!
+        theano_dataset = get_theano_dataset(original_dataset, experiment_name, videos_to_generate, frames_per_video)
+        mynet = Network(video_batches, frames_per_video, out_size, aggregation, base_net, theano_dataset, inp_shape)
+        metrics = mynet.train(nepochs, theano_dataset, ['Train','Test'], collect_in_multiples_of = 1)
+        metric_list.append(metrics)
+        names.append(aggregation)
+
+    from pylab import *
+
+    colors = ['r','g','b','c','y']
+
+    figure()
+    for color, name, vacc in zip(colors,names,metric_list):
+        plot(vacc['Train']['loss'], '-' + color, label = name + " train")
+        plot(vacc['Test']['loss'], '-.'  + color, label = name + " test")
+    ylim([-0.05,0.2])
+    title("Los")
+    legend(loc='upper right')
 
 
+    figure()
+    for color, name, vacc in zip(colors,names,metric_list):
+        plot(vacc['Train']['video_acc'], '-' + color, label = name + " train")
+        plot(vacc['Test']['video_acc'], '-.'  + color, label = name + " test")
+    ylim([0.,1.])
+    title("Video accuracy")
+    legend(loc='lower right')
 
+    colors = ['r','g','b','c','y']
 
-frames_per_video = 3
-video_batches = 50
-out_size = 10
+    figure()
+    for color, name, vacc in zip(colors,names,metric_list):
+        plot(vacc['Train']['frame_acc'], '-' + color, label = name + " train")
+        plot(vacc['Test']['frame_acc'], '-.'  + color, label = name + " test")
+    ylim([0.,1.])
+    title("Frame  accuracy")
+    legend(loc='lower right')
 
-## Dataset definition
-experiment_name = 'mnist_test'
-videos_to_generate = {'Train':1500, 'Val':500, 'Test':1000}
+    show()
 
-
-vaccs, faccs, names = [], [], []
-
-nepochs = 50
-base_net = TypicalCNN
-metric_list = []
-for aggregation in ["poissonbernoulli_aggregation", "tanh_aggregation" , "max_aggregation"]: #"sigmoid_aggregation"
-
-    np.random.seed(1234)
-    theano_dataset = get_theano_dataset(experiment_name, videos_to_generate, frames_per_video)
-    mynet = Network(video_batches, frames_per_video, out_size, aggregation, base_net, theano_dataset)
-    metrics = mynet.train(nepochs, theano_dataset, ['Train','Val'])
-    metric_list.append(metrics)
-    names.append(aggregation)
-
-from pylab import *
-
-colors = ['r','g','b','c','y']
-
-figure()
-for color, name, vacc in zip(colors,names,metric_list):
-    plot(vacc['Train']['loss'], '--' + color, label = name + " train")
-    plot(vacc['Val']['loss'], '-'  + color, label = name + " val")
-ylim([-0.05,0.2])
-title("Los")
-legend(loc='upper right')
-
-
-figure()
-for color, name, vacc in zip(colors,names,metric_list):
-    plot(vacc['Train']['video_acc'], '--' + color, label = name + " train")
-    plot(vacc['Val']['video_acc'], '-'  + color, label = name + " val")
-ylim([0.2,1.])
-title("Video accuracy")
-legend(loc='lower right')
-
-colors = ['r','g','b','c','y']
-
-figure()
-for color, name, vacc in zip(colors,names,metric_list):
-    plot(vacc['Train']['frame_acc'], '--' + color, label = name + " train")
-    plot(vacc['Val']['frame_acc'], '-'  + color, label = name + " val")
-ylim([0.2,1.])
-title("Frame  accuracy")
-legend(loc='lower right')
-
-
-
-print("DONE")
-show()
+    '''
+    ### BE CAREFUL! TRAIN AND VALIDATION ARE EXACTLY THE SAME!!!
+    ## TWO QUESTIONS HERE:
+    ### 1 ) Why the data is the same?
+    a = mynet.netm._getFunctionsCheckInputs()
+    assert ((a['Train'](0,50)[0][0] != a['Test'](0,50)[0][0]).sum()) > 0
+    ### 2 ) Why the output is slightly different in test stage?
+    b = mynet.netm.f_get_set_outputs['Train']
+    assert (b(0,50)[0] != b(0,50)[0]).sum() == 0
+    '''
