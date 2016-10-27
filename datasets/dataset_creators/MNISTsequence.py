@@ -16,7 +16,7 @@ import theano
 import numpy
 import theano.tensor as T
 from numpy import random
-from SequenceCreator import SequencesCollector, SequencesTheano
+from datasets.dataset_creators.SequenceCreator import SequencesCollector, SequencesTheano
 
 ###
 ## This script will prepare a sequence dataset based on MNIST.
@@ -85,7 +85,6 @@ class MNISTOriginalDataset(object):
         }
 
 def aux_visualize_data(theano_sequence, set_name, frames_per_video, batch_size):
-    from pylab import *
     data = theano.function(list(theano_sequence.get_input_tensors().values()), theano_sequence.get_tensor_batch_data(set_name))(batch_size,0)
     video_labels = theano.function(list(theano_sequence.get_input_tensors().values()), theano_sequence.get_tensor_batch_video_labels(set_name))(batch_size,0)
     frame_labels = theano.function(list(theano_sequence.get_input_tensors().values()), theano_sequence.get_tensor_batch_frame_labels(set_name))(batch_size,0)
