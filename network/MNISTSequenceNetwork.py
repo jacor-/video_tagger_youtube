@@ -167,6 +167,7 @@ class Network(object):
         metrics = {'Train': train_metrics, 'Test': test_metrics}
 
         losses = []
+        print("Starting train")
         for n_epoch in range(nepochs):
             t1 = time.time()
             epoch_loss = []
@@ -190,7 +191,6 @@ class Network(object):
         return metrics
 
     def getResults(self, out_frame, y_frames, out_video, y_video):
-        print(out_video.shape)
         vid_general_accuracy = distance.hamming(np.hstack(y_video), np.hstack(out_video > 0.5))
         frame_accuracy = float((y_frames.argmax(axis=2) == out_frame.argmax(axis=2)).sum()) / np.multiply(*out_frame.shape[:2])
         losses = (-y_video * np.log(out_video) -(1-y_video) * np.log(1-out_video) ).sum() / np.multiply(*out_video.shape)
@@ -224,7 +224,7 @@ if __name__ == '__main__':
         video_batches = 50
         out_size = 100
         experiment_name = 'cifar_test_2'
-        videos_to_generate = {'Train':10000, 'Test':1000}
+        videos_to_generate = {'Train':25000, 'Test':1000}
         base_net = TypicalCNN
         inp_shape = [3,32,32]
 
@@ -233,7 +233,7 @@ if __name__ == '__main__':
 
     vaccs, faccs, names = [], [], []
 
-    nepochs = 3
+    nepochs = 250
     metric_list = []
 
     for aggregation in ["max_aggregation"]:#, "tanh_aggregation" , "max_aggregation"]: #"sigmoid_aggregation"
@@ -246,6 +246,7 @@ if __name__ == '__main__':
         metric_list.append(metrics)
         names.append(aggregation)
 
+    '''
     from pylab import *
 
     colors = ['r','g','b','c','y']
@@ -278,6 +279,7 @@ if __name__ == '__main__':
     legend(loc='lower right')
 
     show()
+    '''
 
     '''
     ### BE CAREFUL! TRAIN AND VALIDATION ARE EXACTLY THE SAME!!!

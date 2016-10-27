@@ -15,7 +15,7 @@ import theano
 import numpy
 import theano.tensor as T
 from numpy import random
-from SequenceCreator import SequencesCollector, SequencesTheano
+from datasets.dataset_creators.SequenceCreator import SequencesCollector, SequencesTheano
 from pylab import *
 
 ###
@@ -38,9 +38,9 @@ class CIFAROriginalDataset(object):
             labels = np.array(data_set['fine_labels'])
             return images, labels
 
-        meta = numpy.load('%s/meta'%dataset)['fine_label_names']
-        train_set = getImagesAndLabels(numpy.load('%s/train'%dataset))
-        test_set  = getImagesAndLabels(numpy.load('%s/test'%dataset))
+        meta = numpy.load(open('%s/meta'%dataset,'rb'), encoding ='latin1')['fine_label_names']
+        train_set = getImagesAndLabels(numpy.load(open('%s/train'%dataset,'rb'), encoding ='latin1'))
+        test_set  = getImagesAndLabels(numpy.load(open('%s/test'%dataset,'rb'), encoding ='latin1'))
         return train_set, test_set, meta
 
     @staticmethod
