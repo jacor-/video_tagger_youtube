@@ -23,6 +23,7 @@ from datasets.dataset_creators.CIFARsequence import CIFAROriginalDataset
 from datasets.dataset_creators.SequenceCreator import get_theano_dataset
 from custom_layers.batch_average import ImagePoolToVideo, Video2ImagePool, VideoSummarySumSigmoidLayer, VideoSummaryMaxLayer, VideoSummarySumTanhLayer, VideoSummaryPoissonBernoulli
 from custom_layers.subnetworks.cnn import TypicalCNN
+from custom_layers.subnetworks.googlenet import Googlenet
 from scipy.spatial import distance
 #theano.config.optimizer = 'None'
 #theano.config.dnn.enabled = 'True'
@@ -225,7 +226,7 @@ if __name__ == '__main__':
         out_size = 100
         experiment_name = 'cifar_test_2'
         videos_to_generate = {'Train':10000, 'Test':1000}
-        base_net = TypicalCNN
+        base_net = Googlenet
         inp_shape = [3,32,32]
 
     else:
