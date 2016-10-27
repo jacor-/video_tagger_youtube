@@ -38,7 +38,7 @@ class GooglenetNetwork(object):
 
             # Load the weights, set these parameters into the network
             with open(self.weights_filename, 'rb') as f:
-                params = pickle.load(f)
+                params = pickle.load(f, encoding = 'latin1')
             output_layer = self.net['loss3/classifier']
             lasagne.layers.set_all_param_values(output_layer, params['param values'])
             # We return the network itself, class names and the mean_image
