@@ -225,13 +225,8 @@ if __name__ == '__main__':
         video_batches = 50
         out_size = 100
         experiment_name = 'cifar_test_2'
-<<<<<<< HEAD
         videos_to_generate = {'Train':10000, 'Test':1000}
         base_net = Googlenet
-=======
-        videos_to_generate = {'Train':25000, 'Test':1000}
-        base_net = TypicalCNN
->>>>>>> 19ea5880ed4e021c235096cb8d7b4f6e3ed8f6be
         inp_shape = [3,32,32]
 
     else:
