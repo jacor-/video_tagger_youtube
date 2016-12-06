@@ -178,6 +178,9 @@ class Network(object):
                 epoch_loss.append(loss)
             losses.append(np.mean(epoch_loss))
 
+
+            print("Epoch %d     Loss  : %0.5f        Time: %0.2f" % (n_epoch, losses[-1], time.time() - t1))
+
             if n_epoch % collect_in_multiples_of == 0:
                 for set_ in collect_metrics_for:
                     out_frame, y_frames, out_video, y_video = self.netm.getOutputForSet(set_)
@@ -185,9 +188,10 @@ class Network(object):
                     metrics[set_]['video_acc'].append(vac)
                     metrics[set_]['frame_acc'].append(fac)
                     metrics[set_]['loss'].append(loss)
+                print("  Video hamming distance  Train : %0.5f        Test: %0.5f" % (metrics['Train']['video_acc'][-1],metrics['Test']['video_acc'][-1]))
+                print("  Frame accuracy          Train : %0.5f        Test: %0.5f" % (metrics['Train']['frame_acc'][-1],metrics['Test']['frame_acc'][-1]))
 
-            print("Epoch %d .   Loss : %0.5f    . Time: %0.2f" % (n_epoch, losses[-1], time.time() - t1))
-            theano_dataset.shuffle_data('Train')
+            #theano_dataset.shuffle_data('Train')
 
         return metrics
 
@@ -207,6 +211,7 @@ class Network(object):
         print(" - Loss: " + str(losses))
 
 testing_now = 'cifar-100'
+#testing_now = 'mnist'
 
 if __name__ == '__main__':
 
@@ -216,7 +221,7 @@ if __name__ == '__main__':
         video_batches = 50
         out_size = 10
         experiment_name = 'mnist_test_2'
-        videos_to_generate = {'Train':10000, 'Test':1000}
+        videos_to_generate = {'Train':1000, 'Test':100}
         base_net = TypicalCNN
         inp_shape = [1,28,28]
     elif testing_now == 'cifar-100':
@@ -226,24 +231,24 @@ if __name__ == '__main__':
         out_size = 100
         experiment_name = 'cifar_test_2'
         videos_to_generate = {'Train':10000, 'Test':1000}
-        base_net = Googlenet
+        #base_net = Googlenet
+        base_net = TypicalCNN
         inp_shape = [3,32,32]
-
     else:
         raise "Experiment not ready yet!"
 
     vaccs, faccs, names = [], [], []
 
-    nepochs = 250
+    nepochs = 50000
     metric_list = []
 
-    for aggregation in ["max_aggregation"]:#, "tanh_aggregation" , "max_aggregation"]: #"sigmoid_aggregation"
+    for aggregation in ["tanh_aggregation"]:#, "tanh_aggregation" , "max_aggregation"]: #"sigmoid_aggregation"
 
         np.random.seed(1234)
         ### I strongly recommend this function to create the dataset. Pass the parameters and forget about the implementation!
         theano_dataset = get_theano_dataset(original_dataset, experiment_name, videos_to_generate, frames_per_video)
         mynet = Network(video_batches, frames_per_video, out_size, aggregation, base_net, theano_dataset, inp_shape)
-        metrics = mynet.train(nepochs, theano_dataset, ['Train','Test'], collect_in_multiples_of = 1)
+        metrics = mynet.train(nepochs, theano_dataset, ['Train','Test'], collect_in_multiples_of = 15)
         metric_list.append(metrics)
         names.append(aggregation)
 

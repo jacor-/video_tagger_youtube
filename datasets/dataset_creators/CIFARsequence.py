@@ -99,7 +99,6 @@ def aux_visualize_data(theano_sequence, set_name, frames_per_video, batch_size, 
 
         ### We plot each frame in a video within the same subplot
         figure()
-        print(data[i_batch][i].shape)
         for i in range(frames_per_video):
             subplot((frames_per_video+1)*100 + 10 + (i+1))
             imshow(data[i_batch][i].transpose(1,2,0), cmap = cm.Greys, interpolation = 'None')

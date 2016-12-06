@@ -76,11 +76,15 @@ class TypicalCNN(lasagne.layers.Layer):
 
         ### The last layer is a sigmoid to be sure it is multiclass (for mnist it does not matter, but we want do so something scalable)
         ## TODO: IF YOU ARE PREPARING A MONOCLASS; USE A SOFTMAX, OTHERWISE USE A SIGMOID. THIS SHOULD BE A PARAMETER TO BUILD THE NETWORK!
-        ## TODO: BE CAREFUL. TO DO THE MATHS I WANT TO PROPOSE IN THE PAPER, THE CLASSES ARE SUPPOSED TO BE INDEPENDENT!
+        ## TODO: BE CAREFUL. TO DO THE MATHS I WANT TO PROPOSE IN THE PAPER, THE CLASSES ARE SUPPOSED TO BE INDEPENDENT... so SOFTMAX MIGHT NOT BE THE BEST OPTION!
+        #net['probsout'] = lasagne.layers.DenseLayer(
+        #                                            lasagne.layers.dropout(net['featsout'], p=.5),
+        #                                            num_units=self.out_size,
+        #                                            nonlinearity=lasagne.nonlinearities.sigmoid)
         net['probsout'] = lasagne.layers.DenseLayer(
                                                     lasagne.layers.dropout(net['featsout'], p=.5),
                                                     num_units=self.out_size,
-                                                    nonlinearity=lasagne.nonlinearities.sigmoid)
+                                                    nonlinearity=lasagne.nonlinearities.softmax)
 
 
         params = lasagne.layers.get_all_params(net['probsout'], trainable=True)
