@@ -1,6 +1,0 @@
-######
-###
-### TODO: REMOVE THE FILES IN THIS FOLDER PREPARE THEM AS A CUSTOM LAYER / SUBNETWORK. THE CODE IS BASICALLY THE SAME
-###       YOU WILL ONLY NEED TO SPECIFY THE PARAMETERS (example code: custom_layers/subnoetworks/cnn.py)
-###
-#####

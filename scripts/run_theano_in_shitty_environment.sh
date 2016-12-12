@@ -1,1 +1,0 @@
-THEANO_FLAGS="dnn.enabled=False,optimizer=None" PYTHONPATH=. ipython

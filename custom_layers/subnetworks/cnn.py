@@ -31,17 +31,13 @@ import theano.tensor as T
 
 from custom_layers.batch_average import VideoSummarySumSigmoidLayer, ImagePoolToVideo
 
-
-
-
-class TypicalCNN(lasagne.layers.Layer):
+class BaseSimpleCNN(lasagne.layers.Layer):
     def __init__(self, incoming, out_size, **kwargs):
-        super(TypicalCNN, self).__init__(incoming, **kwargs)
+        super(BaseSimpleCNN, self).__init__(incoming, **kwargs)
         self.name_last_layer = 'probsout'
         self.out_size = out_size
         self.mean_image = [0,0,0]
         self.net, inner_params = self.build_model(incoming)
-
         for i, param in enumerate(inner_params):
             self.add_param(param, param.shape.eval(), name=param.name + "_" + str(i))
 
@@ -73,20 +69,34 @@ class TypicalCNN(lasagne.layers.Layer):
                                                     lasagne.layers.dropout(net['mxpool2'], p=.5),
                                                     num_units=256,
                                                     nonlinearity=lasagne.nonlinearities.rectify)
+        params = lasagne.layers.get_all_params(net['featsout'], trainable=True)
+        return net, params
 
-        ### The last layer is a sigmoid to be sure it is multiclass (for mnist it does not matter, but we want do so something scalable)
-        ## TODO: IF YOU ARE PREPARING A MONOCLASS; USE A SOFTMAX, OTHERWISE USE A SIGMOID. THIS SHOULD BE A PARAMETER TO BUILD THE NETWORK!
-        ## TODO: BE CAREFUL. TO DO THE MATHS I WANT TO PROPOSE IN THE PAPER, THE CLASSES ARE SUPPOSED TO BE INDEPENDENT... so SOFTMAX MIGHT NOT BE THE BEST OPTION!
-        #net['probsout'] = lasagne.layers.DenseLayer(
-        #                                            lasagne.layers.dropout(net['featsout'], p=.5),
-        #                                            num_units=self.out_size,
-        #                                            nonlinearity=lasagne.nonlinearities.sigmoid)
+
+class BaseSimpleCNN_Monoclass(BaseSimpleCNN):
+    def __init__(self, incoming, out_size, **kwargs):
+        super(BaseSimpleCNN_Monoclass, self).__init__(incoming, out_size, **kwargs)
+
+    def build_model(self, incoming):
+        net, params = super(BaseSimpleCNN_Monoclass, self).build_model(incoming)
         net['probsout'] = lasagne.layers.DenseLayer(
                                                     lasagne.layers.dropout(net['featsout'], p=.5),
                                                     num_units=self.out_size,
                                                     nonlinearity=lasagne.nonlinearities.softmax)
-
-
         params = lasagne.layers.get_all_params(net['probsout'], trainable=True)
         return net, params
+
+class BaseSimpleCNN_Multiclass(BaseSimpleCNN):
+    def __init__(self, incoming, out_size, **kwargs):
+        super(BaseSimpleCNN_Multiclass, self).__init__(incoming, out_size, **kwargs)
+
+    def build_model(self, incoming):
+        net, params = super(BaseSimpleCNN_Multiclass, self).build_model(incoming)
+        net['probsout'] = lasagne.layers.DenseLayer(
+                                                    lasagne.layers.dropout(net['featsout'], p=.5),
+                                                    num_units=self.out_size,
+                                                    nonlinearity=lasagne.nonlinearities.sigmoid)
+        params = lasagne.layers.get_all_params(net['probsout'], trainable=True)
+        return net, params
+
 
