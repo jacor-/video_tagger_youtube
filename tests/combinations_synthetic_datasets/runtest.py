@@ -1,12 +1,13 @@
 from tests.combinations_synthetic_datasets import args_getter
 from network.SequenceNetworkFunctionalities import Network as AggregatorNetwork
 from custom_layers.subnetworks.cnn import BaseSimpleCNN_Monoclass, BaseSimpleCNN_Multiclass
+from custom_layers.subnetworks.resnets import ResNet_FullPre_Wide_Multiclass, ResNet_FullPre_Wide_Monoclass, ResNet_FullPreActivation_Multiclass, ResNet_FullPreActivation_Monoclass, ResNet_BottleNeck_FullPreActivation_Multiclass, ResNet_BottleNeck_FullPreActivation_Monoclass
+
 from datasets.dataset_creators.SequenceCreator import get_theano_dataset
 import numpy as np
 import logging
 import settings
 import datetime
-
 
 ##
 # This function returns the class implemeting a specific network identified by a string and a boolean indicating whether we want a multiclass classification or not
@@ -15,6 +16,12 @@ import datetime
 def get_base_net(basenetname, multiclass):
     if basenetname == 'simple_cnn':
         BaseNetClass = BaseSimpleCNN_Multiclass if multiclass else BaseSimpleCNN_Monoclass
+    elif basenetname == 'resnet_full_wide':
+        BaseNetClass = ResNet_FullPre_Wide_Multiclass if multiclass else ResNet_FullPre_Wide_Monoclass
+    elif basenetname == 'resnet_full':
+        BaseNetClass = ResNet_FullPreActivation_Multiclass if multiclass else ResNet_FullPreActivation_Monoclass
+    elif basenetname == 'resnet_bottleneck':
+        BaseNetClass = ResNet_BottleNeck_FullPreActivation_Multiclass if multiclass else ResNet_BottleNeck_FullPreActivation_Monoclass
     else:
         err_message = 'This base net is not implemented yet! (%s)' % basenetname
         logging.error(err_message)
