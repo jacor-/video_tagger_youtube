@@ -126,6 +126,19 @@ class ResNet_FullPreActivation_Monoclass(ResNet_FullPreActivation):
 
     def build_model(self, incoming):
         net, params = super(ResNet_FullPreActivation_Monoclass, self).build_model(incoming)
+
+        ## TODO START -- Delete this part
+        #print("Preloading: delete this part!")
+        #import gzip
+        #import pickle
+        #from lasagne.layers import helper
+        #f = gzip.open('temporal_resnet/Identity-Mapping-ResNet-Lasagne/data/weights/normal18_resnet.pklz', 'rb')
+        #all_params = pickle.load(f)
+        #f.close()
+        #helper.set_all_param_values(net['featsout'], all_params)
+        ## TODO END
+
+
         net['probsout'] = lasagne.layers.DenseLayer(
                                                     net['featsout'],
                                                     W=HeNormal(),
@@ -261,7 +274,7 @@ class ResNet_BottleNeck_FullPreActivation_Monoclass(ResNet_BottleNeck_FullPreAct
         super(ResNet_BottleNeck_FullPreActivation_Monoclass, self).__init__(incoming, out_size, n = n, **kwargs)
 
     def build_model(self, incoming):
-        net, params = super(ResNet_BottleNeck_FullPreActivation, self).build_model(incoming)
+        net, params = super(ResNet_BottleNeck_FullPreActivation_Monoclass, self).build_model(incoming)
         net['probsout'] = lasagne.layers.DenseLayer(
                                                     net['featsout'],
                                                     W=HeNormal(),
@@ -275,7 +288,7 @@ class ResNet_BottleNeck_FullPreActivation_Multiclass(ResNet_BottleNeck_FullPreAc
         super(ResNet_BottleNeck_FullPreActivation_Multiclass, self).__init__(incoming, out_size, n = n, **kwargs)
 
     def build_model(self, incoming):
-        net, params = super(ResNet_BottleNeck_FullPreActivation, self).build_model(incoming)
+        net, params = super(ResNet_BottleNeck_FullPreActivation_Multiclass, self).build_model(incoming)
         net['probsout'] = lasagne.layers.DenseLayer(
                                                     net['featsout'],
                                                     W=HeNormal(),

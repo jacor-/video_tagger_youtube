@@ -29,4 +29,6 @@ Iteraciones:
 
 ### THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name=simple_experiment --basenet=resnet_full_wide --multiclass=False --dataset=cifar-10 --log_epochs=1 --nepochs=50000 --aggregation=tanh_aggregation --base_train_examples=100 --base_test_examples=100 --frames=3 --batch=50 --snapshot_epochs=100
 
-### THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name=simple_experiment --basenet=resnet_bottleneck --multiclass=False --dataset=cifar-10 --log_epochs=1 --nepochs=50000 --aggregation=tanh_aggregation --base_train_examples=100 --base_test_examples=100 --frames=3 --batch=5 --snapshot_epochs=100
+### THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name=simple_experiment --basenet=resnet_full --multiclass=False --dataset=cifar-10 --log_epochs=1 --nepochs=50000 --aggregation=tanh_aggregation --base_train_examples=100 --base_test_examples=100 --frames=3 --batch=5 --snapshot_epochs=100
+
+### THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name=mnist_experiment --basenet=simple_cnn --multiclass=True --dataset=mnist --log_epochs=10 --nepochs=50000 --aggregation=max_aggregation --base_train_examples=40000 --base_test_examples=2500 --frames=3 --batch=25 --snapshot_epochs=100
