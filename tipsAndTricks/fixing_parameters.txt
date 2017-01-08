@@ -1,2 +1,0 @@
-## Here you can find how to avoid training some parameters of the network. Nice link!
-https://groups.google.com/forum/#!topic/lasagne-users/vJ9uBT2eVXI

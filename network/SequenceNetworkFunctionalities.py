@@ -173,35 +173,43 @@ class Network(object):
             losses = []
             logging.info("Starting train")
 
+            iters = 0
             for n_epoch in range(nepochs):
+                # Training process
                 t1 = time.time()
                 epoch_loss = []
                 total_batches = theano_dataset.get_num_batches('Train', self.video_batches)
                 for i_batch in range(total_batches):
                     loss = self.train_fn(i_batch, self.video_batches)
                     epoch_loss.append(loss)
-                losses.append(np.mean(epoch_loss))
+                    iters += 1
 
+                    # Logging process for data (only iterations or number of batches). THis way we can actually compare different datasets and processes
+                    if iters % collect_in_multiples_of == 0:
+                        for set_ in collect_metrics_for:
+                            out_frame, y_frames, out_video, y_video = self.netm.getOutputForSet(set_)
+                            loss, vac, fac = self.getResults(out_frame, y_frames, out_video, y_video)
+                            metrics[set_]['video_acc'].append(vac)
+                            metrics[set_]['frame_acc'].append(fac)
+                            metrics[set_]['loss'].append(loss)
 
-                logging.debug("Train video loss epoch %d     Train : %0.5f        Time: %0.2f" % (n_epoch, losses[-1], time.time() - t1))
+                        logging.debug("Eval average video accuracy    epoch: %d    iter : %d    Train : %0.5f    Test: %0.5f" % (n_epoch, iters, metrics['Train']['video_acc'][-1],metrics['Test']['video_acc'][-1]))
+                        logging.debug("Eval frame accuracy distance   epoch: %d    iter : %d    Train : %0.5f    Test: %0.5f" % (n_epoch, iters, metrics['Train']['frame_acc'][-1],metrics['Test']['frame_acc'][-1]))
+
+                # Logging process for snapshots (only epochs)
                 if n_epoch % snapshot_epochs == 0:
                     if experiment_name != None:
                         snapshot_filename = "%s/snapshots/%s_%d.snapshot" % (settings.datapath, experiment_name, n_epoch)
                         logging.debug("Saving snapshot %s" % snapshot_filename)
                         np.save(snapshot_filename, lasagne.layers.get_all_param_values(self.network))
 
-                if n_epoch % collect_in_multiples_of == 0:
-                    for set_ in collect_metrics_for:
-                        out_frame, y_frames, out_video, y_video = self.netm.getOutputForSet(set_)
-                        loss, vac, fac = self.getResults(out_frame, y_frames, out_video, y_video)
-                        metrics[set_]['video_acc'].append(vac)
-                        metrics[set_]['frame_acc'].append(fac)
-                        metrics[set_]['loss'].append(loss)
 
-                    logging.debug("Eval video hamming distance    epoch : %d    Train : %0.5f    Test: %0.5f" % (n_epoch, metrics['Train']['video_acc'][-1],metrics['Test']['video_acc'][-1]))
-                    logging.debug("Eval frame accuracy distance   epoch : %d    Train : %0.5f    Test: %0.5f" % (n_epoch, metrics['Train']['frame_acc'][-1],metrics['Test']['frame_acc'][-1]))
-
+                # whole epoch logging
+                losses.append(np.mean(epoch_loss))
+                logging.debug("Train video loss epoch %d     Train : %0.5f        Time: %0.2f" % (n_epoch, losses[-1], time.time() - t1))
                 theano_dataset.shuffle_data('Train')
+
+
 
         except KeyboardInterrupt:
             # If we voluntarily stop the test, we still want to save the intermediate results we have collected
@@ -210,7 +218,9 @@ class Network(object):
         return metrics
 
     def getResults(self, out_frame, y_frames, out_video, y_video):
-        vid_general_accuracy = distance.hamming(np.hstack(y_video), np.hstack(out_video > 0.5))
+        ## Hamming distance does not assume monoclass or anything like that... it does not even assume that you chose at least one!
+        #vid_general_accuracy = distance.hamming(np.hstack(y_video), np.hstack(out_video > 0.5))
+        vid_general_accuracy = (y_video == (out_video.astype('float32') > 0.5)).mean(axis=1).mean()
         frame_accuracy = float((y_frames.argmax(axis=2) == out_frame.argmax(axis=2)).sum()) / np.multiply(*out_frame.shape[:2])
         losses = (-y_video * np.log(out_video) -(1-y_video) * np.log(1-out_video) ).sum() / np.multiply(*out_video.shape)
         return losses, vid_general_accuracy, frame_accuracy

@@ -1,7 +1,0 @@
-sudo pip install --upgrade youtube_dl
-
-# how to download a specific video
-youtube-dl -o .temp.mp4 https://www.youtube.com/watch?v=GF60Iuh643I
-
-# Example code to collect frames given a video
-https://github.com/dohliam/video-averaging/blob/master/video_average_machine.rb

@@ -341,3 +341,11 @@ if __name__ == "__main__":
 
     youtube_videos = YoutubeVideoCollector(api_key, "test_experiment", search_criteria = search_criteria, videos_per_search = 100, frames_per_video = 20)
     youtube_videos.save_in_vilynx_format(st.youtube_dataset)
+
+
+
+
+
+
+
+# http://stackoverflow.com/questions/9064962/key-frame-extraction-from-video
