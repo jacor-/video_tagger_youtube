@@ -21,6 +21,7 @@ import settings
 import os
 import pickle
 import os.path
+import theano
 
 class GooglenetNetwork(object):
     def __init__(self, incoming, out_size, use_pretrained = True):
