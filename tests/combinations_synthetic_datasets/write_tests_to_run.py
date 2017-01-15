@@ -21,18 +21,19 @@ test_frames = [2,5,8]
 experiment_name = "mnist_test_%s"
 train_examples = 40000
 batch = 25
-base_mnist_test = 'THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name={experiment_name} --basenet=simple_cnn --multiclass={multiclass} --dataset=mnist --log_epochs={log_iters} --nepochs=50 --aggregation={aggregator} --base_train_examples={train_examples} --base_test_examples=1200 --frames={n_frames} --batch={batch} --snapshot_epochs=74'
+nepochs = 500
+base_mnist_test = 'THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name={experiment_name} --basenet=simple_cnn --multiclass={multiclass} --dataset=mnist --log_epochs={log_iters} --nepochs={nepochs} --aggregation={aggregator} --base_train_examples={train_examples} --base_test_examples=1000 --frames={n_frames} --batch={batch} --snapshot_epochs=500'
 
 # 1 - MNIST BASELINE
 log_per_iter = int(round(float(train_examples*10) / batch) / 1)
-test_command = base_mnist_test.format(n_frames = 1, aggregator = 'max_aggregation', experiment_name = experiment_name % 'baseline', multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
+test_command = base_mnist_test.format(nepochs = nepochs, n_frames = 1, aggregator = 'max_aggregation', experiment_name = experiment_name % 'baseline', multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
 print(test_command)
 
 # 2 - MNIST TESTS
 for n_frames in test_frames:
     for aggregation_type in test_aggregators:
         log_per_iter = int(round(float(train_examples*10) / batch) / n_frames)
-        test_command = base_mnist_test.format(n_frames = n_frames, aggregator = aggregation_type, experiment_name = experiment_name % (str(n_frames) + "_" + aggregation_type), multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
+        test_command = base_mnist_test.format(nepochs = nepochs, n_frames = n_frames, aggregator = aggregation_type, experiment_name = experiment_name % (str(n_frames) + "_" + aggregation_type), multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
         print(test_command)
 
 ## CIFAR-10 TESTS
@@ -42,19 +43,20 @@ test_aggregators = ['max_aggregation','poissonbernoulli_aggregation']
 test_frames = [2,5,8]
 experiment_name = "cifar_10_test_%s"
 train_examples = 100000
-batch = 25
-base_mnist_test = 'THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name={experiment_name} --basenet=simple_cnn --multiclass={multiclass} --dataset=cifar-10 --log_epochs={log_iters} --nepochs=250 --aggregation={aggregator} --base_train_examples={train_examples} --base_test_examples=1000 --frames={n_frames} --batch={batch} --snapshot_epochs=99'
+batch = 20
+nepochs = 2500
+base_mnist_test = 'THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name={experiment_name} --basenet=simple_cnn --multiclass={multiclass} --dataset=cifar-10 --log_epochs={log_iters} --nepochs={nepochs} --aggregation={aggregator} --base_train_examples={train_examples} --base_test_examples=1250 --frames={n_frames} --batch={batch} --snapshot_epochs=500'
 
 # 1 - CIFAR-10 BASELINE
 log_per_iter = int(round(float(train_examples*10) / batch) / 1)
-test_command = base_mnist_test.format(n_frames = 1, aggregator = 'max_aggregation', experiment_name = experiment_name % 'baseline', multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
+test_command = base_mnist_test.format(nepochs = nepochs, n_frames = 1, aggregator = 'max_aggregation', experiment_name = experiment_name % 'baseline', multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
 print(test_command)
 
 # 2 - CIFAR-10 TESTS
 for n_frames in test_frames:
     for aggregation_type in test_aggregators:
         log_per_iter = int(round(float(train_examples*10) / batch) / n_frames)
-        test_command = base_mnist_test.format(n_frames = n_frames, aggregator = aggregation_type, experiment_name = experiment_name % (str(n_frames) + "_" + aggregation_type), multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
+        test_command = base_mnist_test.format(nepochs = nepochs, n_frames = n_frames, aggregator = aggregation_type, experiment_name = experiment_name % (str(n_frames) + "_" + aggregation_type), multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
         print(test_command)
 
 ## CIFAR-100 TESTS
@@ -63,17 +65,18 @@ multiclass = False
 test_aggregators = ['max_aggregation','poissonbernoulli_aggregation']
 test_frames = [2,5,8]
 experiment_name = "cifar_100_test_%s"
-
-base_mnist_test = 'THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name={experiment_name} --basenet=simple_cnn --multiclass={multiclass} --dataset=cifar-100 --log_epochs={log_iters} --nepochs=500 --aggregation={aggregator} --base_train_examples={train_examples} --base_test_examples=1000 --frames={n_frames} --batch={batch} --snapshot_epochs=99'
+batch = 15
+nepochs = 5000
+base_mnist_test = 'THEANO_FLAGS="dnn.enabled=True" PYTHONPATH=. python tests/combinations_synthetic_datasets/runtest.py  --name={experiment_name} --basenet=simple_cnn --multiclass={multiclass} --dataset=cifar-100 --log_epochs={log_iters} --nepochs={nepochs} --aggregation={aggregator} --base_train_examples={train_examples} --base_test_examples=12500 --frames={n_frames} --batch={batch} --snapshot_epochs=750'
 
 # 1 - CIFAR-10 BASELINE
 log_per_iter = int(round(float(train_examples*10) / batch) / 1)
-test_command = base_mnist_test.format(n_frames = 1, aggregator = 'max_aggregation', experiment_name = experiment_name % 'baseline', multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
+test_command = base_mnist_test.format(nepochs = nepochs, n_frames = 1, aggregator = 'max_aggregation', experiment_name = experiment_name % 'baseline', multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
 print(test_command)
 
 # 2 - CIFAR-10 TESTS
 for n_frames in test_frames:
     for aggregation_type in test_aggregators:
         log_per_iter = int(round(float(train_examples*10) / batch) / n_frames)
-        test_command = base_mnist_test.format(n_frames = n_frames, aggregator = aggregation_type, experiment_name = experiment_name % (str(n_frames) + "_" + aggregation_type), multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
+        test_command = base_mnist_test.format(nepochs = nepochs, n_frames = n_frames, aggregator = aggregation_type, experiment_name = experiment_name % (str(n_frames) + "_" + aggregation_type), multiclass = str(multiclass), batch = batch, train_examples = train_examples, log_iters = log_per_iter)
         print(test_command)
