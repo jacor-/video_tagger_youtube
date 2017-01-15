@@ -1,8 +1,15 @@
+## Requiremençts:
+## - youtube-dl
+## - avconv
 
 #!/usr/bin/python
 import settings as st
 import numpy as np
 import urllib
+try:
+    urllib.quote
+except:
+    import urllib.parse as urllib
 import requests
 import os.path
 
@@ -78,13 +85,13 @@ class YoutubeVideoCollector(object):
             print("The dataset does not exist. We collect video_ids and tags from youtube and save them into files")
             self.tags, self.video_ids = self.collect_video_ids(search_criteria, videos_per_search)
             np.save(st.path_dataset + "/" + experiment_name + "_tags.npy", self.tags)
-            np.save(st.path_dataset + "/" + experiment_name + "_video_ids.npy", np.array(self.video_ids))
+            np.save(st.path_dataset + "/" + experiment_name + "_video_ids.npy", np.array(list(self.video_ids)))
 
         self.download_frames_and_filter_incorrects()
 
         if save_final_dataset_version:
             np.save(st.path_dataset + "/" + experiment_name + "_tags.npy", self.tags)
-            np.save(st.path_dataset + "/" + experiment_name + "_video_ids.npy", np.array(self.video_ids))
+            np.save(st.path_dataset + "/" + experiment_name + "_video_ids.npy", np.array(list(self.video_ids)))
 
         min_occurences_accepted=50
         max_occurences_accepted=200
@@ -169,6 +176,9 @@ class YoutubeVideoCollector(object):
 
         # If we do not have enough videos, go to the next page
         while len(videos) < videos_per_search:
+            if 'nextPageToken' not in retrieved_videos.keys():
+                print("not enough videos for ", search_criteria)
+                continue
             page_token = retrieved_videos['nextPageToken']
             req = requests.get("https://www.googleapis.com/youtube/v3/search?key={key}&fields=nextPageToken,items(id(videoId))&part=id,snippet&q={query}&maxResults={num_vids}{pageToken}".format(query = p_search_criteria, key = api_key, pageToken = "&pageToken="+page_token, num_vids = str(videos_per_call)))
             retrieved_videos = eval(req.content)
@@ -327,19 +337,20 @@ class VideotagsVocabularyManager(object):
 
 
 if __name__ == "__main__":
-    videos_per_search = 5000
+    videos_per_search = 500
+    frames_per_video = 20
 
     api_key = "AIzaSyDV_m-yM9Fdba2rem6w6Cy2GJeWwE2_3r8"
     search_criteria = [#"dog", "cat", "bird", "turtle",
                        #"fight", "run", "walk", "climb",
-                       "messi neymar suarez", "ronado benzema bale", "guardiola mourinho simeone","barca chelsea munich"
-                       #"guardiola", "mourinho","lebron james", "marc gasol", "pau gasol", "tiger woods", "simeone",
+                       "messi neymar suarez", "ronado benzema bale", "guardiola mourinho simeone","barca chelsea munich",
+                       "guardiola", "mourinho","lebron james", "marc gasol", "pau gasol", "tiger woods", "simeone",
                        #"barcelona", "london", "rome", "amsterdam", "europe", "world",
                        #"plane", "car", "bike",
                        #"mariano rajoy", "pablo iglesias", "pedro sanchez", "albert rivera"
                        ]
 
-    youtube_videos = YoutubeVideoCollector(api_key, "test_experiment", search_criteria = search_criteria, videos_per_search = 100, frames_per_video = 20)
+    youtube_videos = YoutubeVideoCollector(api_key, "youtube_experiment", search_criteria = search_criteria, videos_per_search = videos_per_search, frames_per_video = frames_per_video)
     youtube_videos.save_in_vilynx_format(st.youtube_dataset)
 
 
