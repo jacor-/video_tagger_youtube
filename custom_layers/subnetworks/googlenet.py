@@ -188,3 +188,11 @@ class Googlenet(lasagne.layers.Layer):
 
         return net, params
 
+
+
+if __name__ == '__main__':
+    net, classes, mean_image = GooglenetNetwork(incoming, -1, use_pretrained = True).get_network()
+    inp = theano.tensor.tensor4((1, 3, 224, 224))
+    test = theano.function([inp], self.net['loss3/classifier'])
+    print("Predicted class: ", classes[predicted])
+
