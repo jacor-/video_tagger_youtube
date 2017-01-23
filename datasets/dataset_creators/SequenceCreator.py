@@ -18,13 +18,6 @@ import numpy
 import theano.tensor as T
 from numpy import random
 
-
-### I strongly recommend this function to create the dataset. Pass the parameters and forget about the implementation!
-def get_theano_dataset(original_dataset, experiment_name, videos_to_generate, frames_per_video):
-    video_collector = SequencesCollector(original_dataset, experiment_name, videos_to_generate = videos_to_generate, frames_per_video = frames_per_video)
-    theano_sequence = SequencesTheano(original_dataset, video_collector.get_dataset())
-    return theano_sequence
-
 class SequencesCollector(object):
     def _generate_videos_(self, original_dataset, videos_to_generate):
         self.tags = {}

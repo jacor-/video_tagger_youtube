@@ -22,8 +22,9 @@ import os
 import pickle
 import os.path
 import theano
+import numpy
 
-class GooglenetNetwork(object):
+class BaseGooglenetNetwork(object):
     def __init__(self, incoming, out_size, use_pretrained = True):
         # Some parameters for this specific network
         self.weights_url = "https://s3.amazonaws.com/lasagne/recipes/pretrained/imagenet/blvc_googlenet.pkl"
@@ -39,7 +40,7 @@ class GooglenetNetwork(object):
 
             # Load the weights, set these parameters into the network
             with open(self.weights_filename, 'rb') as f:
-                params = pickle.load(f, encoding = 'latin1')
+                params = numpy.load(f, encoding = 'latin1')
             output_layer = self.net['loss3/classifier']
             lasagne.layers.set_all_param_values(output_layer, params['param values'])
             # We return the network itself, class names and the mean_image
@@ -108,6 +109,9 @@ class GooglenetNetwork(object):
                                         nonlinearity=softmax)
         return net
 
+    def get_output_for(self, input, **kwargs):
+        return lasagne.layers.get_output(self.net['prob'], inputs=input, **kwargs)
+
     def _download_pretrained_weights(self):
         os.system("wget -O network_weights "  + self.weights_url)
         os.system("mv network_weights " + self.weights_filename)
@@ -142,26 +146,13 @@ class GooglenetNetwork(object):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## This one is the same network but poping out the last layer and replacing it by a new properly shaped layer
 class Googlenet(lasagne.layers.Layer):
-    def __init__(self, incoming, out_size, **kwargs):
+    def __init__(self, incoming, out_size, use_pretrained = True ,**kwargs):
         super(Googlenet, self).__init__(incoming, **kwargs)
 
 
-        self.subnetwork = GooglenetNetwork(incoming, out_size)
+        self.subnetwork = BaseGooglenetNetwork(incoming, out_size, use_pretrained)
 
         #We drop the last layer. Que le peten!
         self.name_last_layer = 'pool5/7x7_s1'
@@ -191,10 +182,26 @@ class Googlenet(lasagne.layers.Layer):
 
 
 
-if __name__ == '__main__':
-    # (1, 3, 224, 224)
-    inp = theano.tensor.tensor4()
-    net, classes, mean_image = GooglenetNetwork(inp, -1, use_pretrained = True).get_network()
-    test = theano.function([inp], self.net['loss3/classifier'])
-    print("Predicted class: ", classes[predicted])
+def test_googlenet():
+    def print_results(classes, outs):
+        for line in map(lambda x: classes[x[0]], sorted(zip(range(1000),outs), key = lambda x: x[1])[-5:][::-1]):
+            print("- " + str(line))
 
+
+    from tools.load_images import loadImage
+    l_in = InputLayer((1,3,224, 224))
+    net = BaseGooglenetNetwork(l_in, 1000, use_pretrained = True)
+
+    inp = theano.tensor.tensor4()
+    test = theano.function([inp],net.get_output_for(inp))
+
+    classes = net.classes
+
+    print("We test an image of a cat")
+    print_results(classes, test(loadImage("/home/jose/Desktop/tiny_cat_12573_8950.jpg"))[0])
+    print("We test an image of a bear")
+    print_results(classes, test(loadImage("/home/jose/Desktop/bear.jpg"))[0])
+
+
+if __name__ == '__main__':
+    test_googlenet()

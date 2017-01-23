@@ -1,9 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 from tests.combinations_synthetic_datasets import args_getter
 from network.SequenceNetworkFunctionalities import Network as AggregatorNetwork
 from custom_layers.subnetworks.cnn import BaseSimpleCNN_Monoclass, BaseSimpleCNN_Multiclass
 from custom_layers.subnetworks.resnets import ResNet_FullPre_Wide_Multiclass, ResNet_FullPre_Wide_Monoclass, ResNet_FullPreActivation_Multiclass, ResNet_FullPreActivation_Monoclass, ResNet_BottleNeck_FullPreActivation_Multiclass, ResNet_BottleNeck_FullPreActivation_Monoclass
+from custom_layers.subnetworks.googlenet import Googlenet
 
-from datasets.dataset_creators.SequenceCreator import get_theano_dataset
+from datasets.dataset_instantiator import instantiate_dataset
 import numpy as np
 import logging
 import settings
@@ -22,28 +37,13 @@ def get_base_net(basenetname, multiclass):
         BaseNetClass = ResNet_FullPreActivation_Multiclass if multiclass else ResNet_FullPreActivation_Monoclass
     elif basenetname == 'resnet_bottleneck':
         BaseNetClass = ResNet_BottleNeck_FullPreActivation_Multiclass if multiclass else ResNet_BottleNeck_FullPreActivation_Monoclass
+    elif basenetname == 'googlenet':
+        BaseNetClass = Googlenet
     else:
         err_message = 'This base net is not implemented yet! (%s)' % basenetname
         logging.error(err_message)
         raise Exception(err_message)
     return BaseNetClass
-
-##
-# TODO
-##
-def get_dataset_parameters(inpargs, settings):
-    if inpargs['testing_dataset'] in settings.synthetic_detaset_details.keys():
-        dataset_details = settings.synthetic_detaset_details[inpargs['testing_dataset']]
-        base_dataset = dataset_details['generator_class']()
-        out_size = dataset_details['out_size']
-        videos_to_generate = {'Train':inpargs['base_num_train_examples'],
-                              'Test' :inpargs['base_num_test_examples']}
-        inp_shape = dataset_details['inp_shape']
-    else:
-        err_message = "Experiment not ready yet! (%s)" % inpargs['testing_dataset']
-        logging.error(err_message)
-        raise Exception(err_message)
-    return dataset_details, base_dataset, out_size, videos_to_generate, inp_shape, base_net
 
 ##
 # Given some parameters we will
@@ -65,18 +65,25 @@ if __name__ == '__main__':
         logging.debug("  - parameter: %s --> %s" % (key, str(inpargs[key])))
     logging.debug("-------------------------- ")
 
-    # Load some objects which implements parts of our model
-    ## Load the base network which will be applied to each frame
-    base_net = get_base_net(inpargs['base_net_to_use'], inpargs['multiclass'])
-    ## Load the dataset. Remember that our synthetic datasets is built with permutations of a base original dataset
-    dataset_details, base_dataset, out_size, videos_to_generate, inp_shape, base_net = get_dataset_parameters(inpargs, settings)
-    theano_dataset = get_theano_dataset(base_dataset, experiment_name, videos_to_generate, inpargs['frames_per_video'])
+    # Instantiate the dataset we are going to use
+    dataset_name = inpargs['testing_dataset']
+    frames_per_video = inpargs['frames_per_video']
+    videos_to_generate = {
+                            'Train':inpargs['base_num_train_examples'],
+                            'Test' :inpargs['base_num_test_examples']
+                         }
+    theano_dataset, inp_shape, out_size = instantiate_dataset(dataset_name, frames_per_video, videos_to_generate, experiment_name)
 
-    # Lets train it!
-    mynet = AggregatorNetwork(inpargs['video_batches'], inpargs['frames_per_video'], out_size, inpargs['aggregation'], base_net, theano_dataset, inp_shape)
+    # Instantiate the network we are going to use and create the top aggregator layer
+    video_batches = inpargs['video_batches']
+    aggregation_type = inpargs['aggregation']
+    base_net = get_base_net(inpargs['base_net_to_use'], inpargs['multiclass'])
+    mynet = AggregatorNetwork(video_batches, frames_per_video, out_size, aggregation_type, base_net, theano_dataset, inp_shape)
+
 
     metrics = mynet.train(inpargs['nepochs'], theano_dataset, collect_metrics_for = ['Train','Test'], experiment_name = experiment_name, snapshot_epochs =inpargs['snapshot_interval_epochs'], collect_in_multiples_of = inpargs['log_interval_epochs'])
-
     results_file = "%s/results/%s" % (settings.datapath, experiment_name)
-    logging.info("Resuts being saved on : %s" % results_file)
+
+    # Save results
+    logging.info("Results being saved on : %s" % results_file)
     np.save(results_file, metrics)
