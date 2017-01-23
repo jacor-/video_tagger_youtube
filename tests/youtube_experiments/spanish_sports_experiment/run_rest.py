@@ -232,12 +232,12 @@ if __name__ == '__main__':
     #inpargs = args_getter.get_arguments()
     inpargs = {
             'dataset_name' : 'youtube',
-            'experiment_basename' : 'youtube_small_experiment',#'youtube_experiment',
-            'frames_per_video' : 5, #20,
-            'video_batches' : 2,
+            'experiment_basename' : 'youtube_experiment',#'youtube_small_experiment',
+            'frames_per_video' : 20, #5, #20,
+            'video_batches' : 10,
             'aggregation' : 'max_aggregation',
-            'nepochs':100,
-            'snapshot_interval_epochs': 10000
+            'nepochs':2000,
+            'snapshot_interval_epochs': 50
         }
 
 
@@ -271,43 +271,6 @@ if __name__ == '__main__':
     # Save results
     logging.info("Results being saved on : %s" % results_file)
     np.save(results_file, metrics)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
